@@ -247,6 +247,12 @@ Projenin kök dizininde aşağıdaki komutu çalıştırın:
 docker compose up -d --build
 ```
 
+Sistemi başlatın:
+
+```bash
+docker compose up -d
+```
+
 ## Bu komut ne yapar?
 
 * İlgili Docker image’larını oluşturur
