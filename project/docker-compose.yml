@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # 1. VEKTÖR VERİTABANI SERVİSİ
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6333:6333" # HTTP API Portu
+      - "6334:6334" # gRPC Portu
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    networks:
+      - tesvik_network
+
+ # 2. RAG SERVİSİ
+  rag_service:
+    build:
+      context: .
+      dockerfile: services/rag_service/Dockerfile
+    container_name: rag_service
+    ports:
+      - "8002:8002"
+    # --- CANLI KOD AKTARIMI İÇİN BU İKİ BLOK EKLENDİ ---
+    volumes:
+      - ./services/rag_service:/app  # Yerel bilgisayarınızdaki kodları Docker'a canlı bağlar
+    command: uvicorn main:app --host 0.0.0.0 --port 8002 --reload  # Değişiklikleri anında algılar
+    # --------------------------------------------------
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - qdrant
+    networks:
+      - tesvik_network
+
+# 3. VERİ YÜKLEME SERVİSİ
+  ingestion_service:
+    build:
+      context: .
+      dockerfile: services/ingestion_service/Dockerfile
+    container_name: ingestion_service
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - qdrant
+    networks:
+      - tesvik_network
+
+# Verilerin kalıcı olması için Volume tanımlıyoruz
+volumes:
+  qdrant_storage:
+
+# Servislerin birbiriyle konuşabilmesi için ortak ağ oluşturuyoruz
+networks:
+  tesvik_network:
+    driver: bridge
