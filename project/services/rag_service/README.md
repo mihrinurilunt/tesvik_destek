@@ -329,7 +329,7 @@ Bu arayüz üzerinden:
 * geliştirme sürecinde hızlı doğrulama yapabilirsiniz.
 
 ---
----
+
 # Qdrant veritabanını kontrol paneli
 
 Tarayıcınızı açın ve şu adrese gidin: 
