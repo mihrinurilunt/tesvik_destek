@@ -329,6 +329,19 @@ Bu arayüz üzerinden:
 * geliştirme sürecinde hızlı doğrulama yapabilirsiniz.
 
 ---
+---
+# Qdrant veritabanını kontrol paneli
+
+Tarayıcınızı açın ve şu adrese gidin: 
+
+```bash
+http://localhost:6333/dashboard
+```
+
+Sol menüdeki "Collections" sekmesine tıkladığınızda tesvikler_v2 adında bir koleksiyon görmelisiniz.
+
+Bu koleksiyonun içine girdiğinizde, ingestion_service tarafından yüklenen verileri (noktaları/vektörleri) görüyorsanız veritabanınız çalışıyor ve doludur.
+---
 
 # 🧩 Örnek Kullanım Akışları
 
