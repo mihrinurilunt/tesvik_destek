@@ -1,0 +1,9 @@
+services:
+  ingestion_service:
+    build:
+      context: .
+      dockerfile: services/ingestion_service/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
