@@ -18,17 +18,31 @@ class RagRetriever:
         self.storage_context = StorageContext.from_defaults(vector_store=self.vector_store)
         self.index = VectorStoreIndex.from_vector_store(self.vector_store, storage_context=self.storage_context)
 
+# services/rag_service/retrieval.py dosyasındaki fonksiyonun güncel hali:
+
     def retrieve_context(self, query: str, program_name: str = None, top_k: int = 4) -> str:
-        """Qdrant üzerinden ilgili döküman parçalarını (nodes/chunks) getirir."""
+        """
+        Qdrant üzerinden ilgili döküman parçalarını (nodes/chunks) getirir.
+        Program adı belirtilmemişse genel veritabanı araması (filtresiz) yapar.
+        """
         filtreler = None
-        if program_name:
-            filtreler = MetadataFilters(
-                filters=[MetadataFilter(key="program_adi", value=program_name)]
-            )
         
+        # Akıllı Filtre Kontrolü: 
+        # program_name None değilse, boş değilse ve Swagger'ın varsayılan "string" kelimesi değilse filtre uygula
+# services/rag_service/retrieval.py içindeki ilgili kısmı şu şekilde güncelleyin:
+
+        if program_name and program_name.strip() and program_name.lower() != "string":
+            filtreler = MetadataFilters(
+                # "program_adi" yerine "program_name" yapıyoruz (API Contract Uyumu)
+                filters=[MetadataFilter(key="program_name", value=program_name.strip())]
+            )
+            print(f"🎯 RAG araması '{program_name}' programı için filtrelendi.")
+        else:
+            # Filtre None kalırsa Qdrant tüm koleksiyonda semantik arama yapar!
+            print("🌐 RAG araması genel veritabanı genelinde (filtresiz) yapılıyor.")
+            
         retriever = self.index.as_retriever(similarity_top_k=top_k, filters=filtreler)
         nodes = retriever.retrieve(query)
         
-        # Parçaları birleştirip tek bir metin (context) oluşturur
         context_text = "\n\n".join([node.node.get_content() for node in nodes])
         return context_text

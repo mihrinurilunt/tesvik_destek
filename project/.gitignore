@@ -5,3 +5,4 @@ qdrant_db/
 Rag/qdrant_db/
 __pycache__/
 *.pyc
+.env.example

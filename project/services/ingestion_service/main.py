@@ -6,20 +6,22 @@ from llama_index.core import Document, VectorStoreIndex, StorageContext, Setting
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.embeddings.openai import OpenAIEmbedding
 
+# Shared katmanından resmi veri modelimizi çağırıyoruz (API Contract Uyumu)
+from shared.models import ProgramDocument
+
 load_dotenv()
 
 # Embedding modeli ayarı (RAG ile ortak)
 Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-small")
 
 QDRANT_URL = os.environ.get("QDRANT_URL", "http://qdrant:6333")
-# Arkadaşınızın klasör yapısındaki data/output.json dosyasını hedefliyoruz
 JSON_PATH = os.path.join(os.path.dirname(__file__), "data", "output.json")
 
 def run_ingestion():
     print("🚀 API Contract Uyumlu Ingestion Pipeline Başlatılıyor...")
     
     if not os.path.exists(JSON_PATH):
-        print(f"❌ HATA: {JSON_PATH} bulunamadı! Lütfen kazıyıcının ürettiği output.json dosyasını buraya koyun.")
+        print(f"❌ HATA: {JSON_PATH} bulunamadı! Lütfen data/output.json dosyasını buraya koyun.")
         return
         
     with open(JSON_PATH, "r", encoding="utf-8") as f:
@@ -27,7 +29,6 @@ def run_ingestion():
         
     documents = []
     
-    # JSON listesi içinde döngü kuruyoruz
     for d in ham_veriler:
         program_id = d.get("program_id", "id_belirtilmemis")
         program_name = d.get("program_name", "Bilinmeyen Program")
@@ -55,7 +56,7 @@ def run_ingestion():
             elif "form" in title or "ekler" in title:
                 ekler_text = content
 
-        # 1. AKILLI SEKTÖR VE İHTİYAÇ ETİKETLEME (API Contract için list[str] üretimi)
+        # AKILLI SEKTÖR VE İHTİYAÇ ETİKETLEME (Kategori tespiti)
         sectors = []
         tarama_metni = f"{program_name} {amaci_text} {sartlar_text}".lower()
         if any(k in tarama_metni for k in ["imalat", "sanayi", "üretim"]):
@@ -84,36 +85,58 @@ def run_ingestion():
         if not needs:
             needs = ["Ar-Ge", "İstihdam", "Yatırım", "İhracat"]
 
-        # 2. Vektör indeksleme için birleşik döküman metnini oluşturma
+        # --- VERİ DOĞRULAMA (Pydantic Validation) ---
+        # Kazınan veriyi Qdrant'a yüklemeden önce API Contract şemasına göre denetliyoruz
+        try:
+            validated_doc = ProgramDocument(
+                program_id=program_id,
+                program_name=program_name,
+                institution=institution,
+                description=amaci_text if len(amaci_text) >= 10 else f"{program_name} resmi analiz dökümanıdır.",
+                application_url=application_url,
+                sectors=sectors,
+                needs=needs,
+                conditions=sartlar_text.split("\n") if sartlar_text else [],
+                required_documents=ekler_text.split(",") if ekler_text else []
+            )
+        except Exception as ve:
+            # Eğer veri sözleşmeye uymuyorsa hata logu basar ve bu hibe programını veritabanına eklemeden geçer (atlar)
+            print(f"⚠️ UYARI: '{program_name}' verisi API Sözleşmesine uymadığı için atlandı! Hata: {ve}")
+            continue
+        # ---------------------------------------------
+
+        # Vektör indeksleme için birleşik döküman metnini oluşturma
         document_text = f"""
-        Program Adı: {program_name}
-        Kurum: {institution}
-        Amacı: {amaci_text}
+        Program Adı: {validated_doc.program_name}
+        Kurum: {validated_doc.institution}
+        Amacı: {validated_doc.description}
         Başvuru Şartları: {sartlar_text}
         Destek Unsurları: {unsurlar_text}
         Belgeler & Formlar: {ekler_text}
         """
 
-        # 3. API Contract Şemasına (ProgramDocument) %100 Uyumlu Metadata Tanımı
+        # API Contract modelinden (validated_doc) doğrulanmış temiz üst bilgileri (metadata) alıyoruz
         metadata = {
-            "program_id": program_id,
-            "program_name": program_name,
-            "institution": institution,
-            "description": amaci_text[:500], # Zorunlu alan
-            "application_url": application_url, # Zorunlu alan
-            "sectors": sectors, # Zorunlu alan
-            "needs": needs, # Zorunlu alan
-            "conditions": sartlar_text.split("\n") if sartlar_text else [], # Opsiyonel
-            "required_documents": ekler_text.split(",")[:10] if ekler_text else [] # Opsiyonel
+            "program_id": validated_doc.program_id,
+            "program_name": validated_doc.program_name,
+            "institution": validated_doc.institution,
+            "application_url": str(validated_doc.application_url),
+            "sectors": validated_doc.sectors,
+            "needs": validated_doc.needs
         }
         
-        doc = Document(text=document_text, metadata=metadata)
+        doc = Document(text=document_text, metadata=metadata, doc_id=validated_doc.program_id)
         documents.append(doc)
         
-    print(f"📦 {len(documents)} adet döküman API Contract formatına dönüştürüldü. Qdrant'a yükleniyor...")
+    print(f"📦 {len(documents)} adet döküman başarıyla doğrulandı ve hazırlandı. Qdrant'a yükleniyor...")
     
     try:
         client = qdrant_client.QdrantClient(url=QDRANT_URL)
+        
+        if client.collection_exists(collection_name="tesvikler_v2"):
+            print("🗑️ Eski ve hatalı şemalı 'tesvikler_v2' tablosu otomatik siliniyor...")
+            client.delete_collection(collection_name="tesvikler_v2")
+        
         vector_store = QdrantVectorStore(
             client=client, 
             collection_name="tesvikler_v2",
@@ -121,12 +144,11 @@ def run_ingestion():
         )
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
         
-        # İndexleme işlemini başlat
         VectorStoreIndex.from_documents(
             documents, 
             storage_context=storage_context
         )
-        print("✅ BAŞARILI: Tüm dökümanlar API Contract modeliyle Qdrant veritabanına kaydedildi!")
+        print("✅ BAŞARILI: Tüm dökümanlar API Sözleşmesine uygun olarak Qdrant'a kaydedildi!")
         
     except Exception as e:
         print(f"❌ HATA: Yükleme başarısız: {e}")

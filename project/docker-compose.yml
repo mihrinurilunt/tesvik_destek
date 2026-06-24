@@ -24,6 +24,7 @@ services:
     # --- CANLI KOD AKTARIMI İÇİN BU İKİ BLOK EKLENDİ ---
     volumes:
       - ./services/rag_service:/app  # Yerel bilgisayarınızdaki kodları Docker'a canlı bağlar
+      - ./shared:/app/shared  
     command: uvicorn main:app --host 0.0.0.0 --port 8002 --reload  # Değişiklikleri anında algılar
     # --------------------------------------------------
     environment:
@@ -40,6 +41,8 @@ services:
       context: .
       dockerfile: services/ingestion_service/Dockerfile
     container_name: ingestion_service
+    profiles:
+      - setup
     environment:
       - QDRANT_URL=http://qdrant:6333
       - OPENAI_API_KEY=${OPENAI_API_KEY}
