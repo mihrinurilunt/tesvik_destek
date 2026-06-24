@@ -1,5 +1,4 @@
-
-# Ingestion Service (Data Ingestion & Vectorization Pipeline)
+# 🚀 Ingestion Service (Data Ingestion & Vectorization Pipeline)
 
 Bu servis, **KOBİ Teşvik & Destek Sistemi** mimarisinde yer alan; scraper servisleri tarafından üretilen ham teşvik ve destek dökümanlarını işleyen, temizleyen, anlamsal parçalara bölen, embedding oluşturan ve sonuçları **Qdrant Vector Database** içerisine yükleyen bağımsız bir veri işleme mikroservisidir.
 
@@ -7,7 +6,7 @@ Sistem, veritabanına yalnızca doğrulanmış ve standartlaştırılmış veril
 
 ---
 
-# İçindekiler
+# 📌 İçindekiler
 
 * [Proje Özeti](#-proje-özeti)
 * [Teknolojik Altyapı](#-teknolojik-altyapı)
@@ -31,7 +30,7 @@ Sistem, veritabanına yalnızca doğrulanmış ve standartlaştırılmış veril
 
 ---
 
-# Proje Özeti
+# 📖 Proje Özeti
 
 Ingestion Service, farklı kurumların (KOSGEB, TÜBİTAK, TKDK, TEYDEB vb.) yayınladığı teşvik ve destek programlarını işleyerek, yapay zeka destekli semantik arama sistemlerinde kullanılabilecek yüksek kaliteli veri setleri üretmek amacıyla geliştirilmiştir.
 
@@ -48,7 +47,7 @@ Bu süreç sonucunda RAG sistemleri, semantic search servisleri ve LLM tabanlı 
 
 ---
 
-# Teknolojik Altyapı
+# 🛠️ Teknolojik Altyapı
 
 Bu mikroservis aşağıdaki teknolojiler üzerine kuruludur:
 
@@ -62,7 +61,7 @@ Bu mikroservis aşağıdaki teknolojiler üzerine kuruludur:
 
 ---
 
-# Üstlendiği Sorumluluklar
+# 📋 Üstlendiği Sorumluluklar
 
 Ingestion Service aşağıdaki temel görevleri yerine getirir:
 
@@ -92,12 +91,13 @@ Aynı programın tekrar yüklenmesi durumunda upsert mantığı ile güncelleme 
 
 ---
 
-# Mimari Yaklaşım
+# 🧠 Mimari Yaklaşım
 
 Servis klasik bir ETL (Extract → Transform → Load) veri işleme hattı olarak tasarlanmıştır.
 
 ## Akış Özeti
 
+```text
 Scrapers
     │
     ▼
@@ -117,6 +117,7 @@ Embedding Generation
     │
     ▼
 Qdrant Vector Database
+````
 
 ## Avantajları
 
@@ -128,8 +129,9 @@ Qdrant Vector Database
 
 ---
 
-# Proje Yapısı
+# 📂 Proje Yapısı
 
+```text
 ingestion_service/
 
 ├── chunkers/
@@ -144,10 +146,11 @@ ingestion_service/
 ├── main.py
 ├── Dockerfile
 └── requirements.txt
+```
 
 ---
 
-# Veri İşleme Akışı
+# 🔄 Veri İşleme Akışı
 
 ## 1. Veri Yükleme
 
@@ -155,11 +158,13 @@ Scraper servislerinden gelen JSON dosyaları okunur.
 
 ### Örnek Veri
 
+```json
 {
   "url": "https://example.com/program",
   "source": "kosgeb",
   "program_name": "Girişim Sermayesi Yatırım Fonları"
 }
+```
 
 ---
 
@@ -188,11 +193,15 @@ Cleaner katmanı aşağıdaki işlemleri uygular:
 
 ### Örnek
 
+```html
 <p>Başvuru şartları...</p>
+```
 
 ↓
 
+```text
 Başvuru şartları...
+```
 
 ---
 
@@ -200,12 +209,14 @@ Başvuru şartları...
 
 Uzun içerikler anlamlı bölümlere ayrılır.
 
+```text
 Programın Amacı
 
 ↓
 Chunk 1
 Chunk 2
 Chunk 3
+```
 
 Her chunk bağımsız olarak vektörleştirilir.
 
@@ -226,18 +237,22 @@ Her chunk embedding vektörüne dönüştürülür.
 
 Üretilen vektörler aşağıdaki koleksiyona kaydedilir:
 
+```text
 Collection : tesvikler_v2
 Vector Name: text-dense
+```
 
 ---
 
-# Teknik Özellikler
+# ⚙️ Teknik Özellikler
 
 ## Ortak Model Doğrulaması
 
 Tüm servisler aynı veri sözleşmesini kullanır:
 
+```python
 ProgramDocument
+```
 
 ---
 
@@ -269,7 +284,7 @@ Tüm servislerde ortak kullanılır.
 
 ---
 
-# Ortam Değişkenleri (Environment Variables)
+# ⚙️ Ortam Değişkenleri (Environment Variables)
 
 ```env
 OPENAI_API_KEY=sk-proj-xxxxxxxxxxxx
@@ -281,7 +296,7 @@ EMBEDDING_MODEL=text-embedding-3-small
 
 ---
 
-# Çalıştırma Talimatları
+# 💻 Çalıştırma Talimatları
 
 ## Docker ile Çalıştırma
 
@@ -337,7 +352,7 @@ python main.py
 
 ---
 
-# Yeni Veri Kaynağı Eklemek
+# 🔌 Yeni Veri Kaynağı Eklemek
 
 ## 1. Yeni Scraper Dosyası Oluştur
 
