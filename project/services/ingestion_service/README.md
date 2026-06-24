@@ -842,6 +842,4 @@ Sonuç olarak sistemin geri kalan bileşenleri, **temiz, doğrulanmış, indeksl
 * Bu proje KOBİ Teşvik & Destek Sistemi kapsamında geliştirilmiştir.
 
 * Tüm hakları ilgili proje ekibine aittir.
-
-```
 ```
