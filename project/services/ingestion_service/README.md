@@ -1,4 +1,4 @@
-# 🚀 Ingestion Service (Data Ingestion & Vectorization Pipeline)
+# Ingestion Service (Data Ingestion & Vectorization Pipeline)
 
 Bu servis, **KOBİ Teşvik & Destek Sistemi** mimarisinde yer alan; scraper servisleri tarafından üretilen ham teşvik ve destek dökümanlarını işleyen, temizleyen, anlamsal parçalara bölen, embedding oluşturan ve sonuçları **Qdrant Vector Database** içerisine yükleyen bağımsız bir veri işleme mikroservisidir.
 
@@ -6,7 +6,7 @@ Sistem, veritabanına yalnızca doğrulanmış ve standartlaştırılmış veril
 
 ---
 
-# 📌 İçindekiler
+# İçindekiler
 
 * [Proje Özeti](#-proje-özeti)
 * [Teknolojik Altyapı](#-teknolojik-altyapı)
@@ -30,7 +30,7 @@ Sistem, veritabanına yalnızca doğrulanmış ve standartlaştırılmış veril
 
 ---
 
-# 📖 Proje Özeti
+# Proje Özeti
 
 Ingestion Service, farklı kurumların (KOSGEB, TÜBİTAK, TKDK, TEYDEB vb.) yayınladığı teşvik ve destek programlarını işleyerek, yapay zeka destekli semantik arama sistemlerinde kullanılabilecek yüksek kaliteli veri setleri üretmek amacıyla geliştirilmiştir.
 
@@ -47,7 +47,7 @@ Bu süreç sonucunda RAG sistemleri, semantic search servisleri ve LLM tabanlı 
 
 ---
 
-# 🛠️ Teknolojik Altyapı
+# Teknolojik Altyapı
 
 Bu mikroservis aşağıdaki teknolojiler üzerine kuruludur:
 
@@ -61,7 +61,7 @@ Bu mikroservis aşağıdaki teknolojiler üzerine kuruludur:
 
 ---
 
-# 📋 Üstlendiği Sorumluluklar
+# Üstlendiği Sorumluluklar
 
 Ingestion Service aşağıdaki temel görevleri yerine getirir:
 
@@ -91,7 +91,7 @@ Aynı programın tekrar yüklenmesi durumunda upsert mantığı ile güncelleme 
 
 ---
 
-# 🧠 Mimari Yaklaşım
+# Mimari Yaklaşım
 
 Servis klasik bir ETL (Extract → Transform → Load) veri işleme hattı olarak tasarlanmıştır.
 
@@ -129,7 +129,7 @@ Qdrant Vector Database
 
 ---
 
-# 📂 Proje Yapısı
+# Proje Yapısı
 
 ```text
 ingestion_service/
@@ -150,7 +150,7 @@ ingestion_service/
 
 ---
 
-# 🔄 Veri İşleme Akışı
+# Veri İşleme Akışı
 
 ## 1. Veri Yükleme
 
@@ -244,7 +244,7 @@ Vector Name: text-dense
 
 ---
 
-# ⚙️ Teknik Özellikler
+# Teknik Özellikler
 
 ## Ortak Model Doğrulaması
 
@@ -284,7 +284,7 @@ Tüm servislerde ortak kullanılır.
 
 ---
 
-# ⚙️ Ortam Değişkenleri (Environment Variables)
+# Ortam Değişkenleri (Environment Variables)
 
 ```env
 OPENAI_API_KEY=sk-proj-xxxxxxxxxxxx
@@ -296,7 +296,7 @@ EMBEDDING_MODEL=text-embedding-3-small
 
 ---
 
-# 💻 Çalıştırma Talimatları
+# Çalıştırma Talimatları
 
 ## Docker ile Çalıştırma
 
@@ -352,7 +352,7 @@ python main.py
 
 ---
 
-# 🔌 Yeni Veri Kaynağı Eklemek
+# Yeni Veri Kaynağı Eklemek
 
 ## 1. Yeni Scraper Dosyası Oluştur
 
@@ -384,20 +384,7 @@ SCRAPERS = {
 
 ---
 
-# 🚀 Gelecek Geliştirmeler
-
-* Hybrid Search (Dense + Sparse)
-* Incremental Ingestion
-* Change Detection
-* Multi-Embedding Support
-* Async / Parallel Processing
-* Monitoring & Metrics
-* Dead Letter Queue (DLQ)
-* Versioned Document Storage
-
----
-
-# ✅ Özet
+# Özet
 
 Ingestion Service, KOBİ Teşvik & Destek Sistemi içerisinde:
 
@@ -408,6 +395,12 @@ Ingestion Service, KOBİ Teşvik & Destek Sistemi içerisinde:
 * Semantic Search ve RAG servisleri için gerekli veri altyapısını hazırlar
 
 Bu sayede sistem genelinde güvenilir, ölçeklenebilir ve sürdürülebilir bir yapay zeka veri hattı oluşturulur.
+
+# Lisans
+
+* Bu proje KOBİ Teşvik & Destek Sistemi kapsamında geliştirilmiştir.
+
+* Tüm hakları ilgili proje ekibine aittir.
 
 ```
 ```
