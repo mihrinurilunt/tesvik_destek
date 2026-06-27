@@ -48,6 +48,12 @@ OUT_OF_SCOPE_MESSAGE = (
     "Şirketinizle ilgili teşvik, destek, başvuru şartı veya uygunluk sorularında yardımcı olabilirim."
 )
 
+GENERAL_INFO_MESSAGE = (
+    "Bu sistem, işletmenizin bilgilerine göre uygun teşvik ve destekleri bulmanıza "
+    "yardımcı olur. Formdan şirket bilgilerinizi girerek öneri alabilir veya chat "
+    "üzerinden başvuru şartları, belgeler ve uygunluk hakkında soru sorabilirsiniz."
+)
+
 UNKNOWN_INTENT_MESSAGE = (
     "Tam olarak ne istediğinizi anlayamadım. İşletmenize uygun destekleri mi bulmamı istiyorsunuz, "
     "yoksa belirli bir destek hakkında bilgi mi almak istiyorsunuz?"
