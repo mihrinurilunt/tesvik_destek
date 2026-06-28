@@ -1,10 +1,12 @@
 services:
-  ingestion_service:
+  orchestration_service:
     build:
       context: .
-      dockerfile: services/ingestion_service/Dockerfile
+      dockerfile: services/orchestration_service/Dockerfile
     ports:
       - "8000:8000"
-    volumes:
-      - ./data:/app/data
-  
+    env_file:
+      - .env
+    environment:
+      - MATCHING_SERVICE_URL=http://matching_service:8001
+      - RAG_SERVICE_URL=http://rag_service:8002
