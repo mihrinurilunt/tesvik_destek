@@ -1,48 +1,100 @@
-import os
-import qdrant_client
-from llama_index.core import VectorStoreIndex, StorageContext, Settings
-from llama_index.vector_stores.qdrant import QdrantVectorStore
-from llama_index.embeddings.openai import OpenAIEmbedding
-from llama_index.core.vector_stores import MetadataFilter, MetadataFilters
+from typing import Optional
 
-# Embedding modeli ayarları
-Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-small")
+from qdrant_client import QdrantClient
+from qdrant_client.models import Filter, FieldCondition, MatchAny
 
-# Docker ağında veya lokalde Qdrant bağlantı adresi
-QDRANT_URL = os.environ.get("QDRANT_URL", "http://qdrant:6333")
+from shared.models import MatchResult, SourceChunk
+from services.rag_service.llm_client import create_embedding
 
-class RagRetriever:
-    def __init__(self):
-        self.client = qdrant_client.QdrantClient(url=QDRANT_URL)
-        self.vector_store = QdrantVectorStore(client=self.client, collection_name="tesvikler_v2", vector_name="text-dense")
-        self.storage_context = StorageContext.from_defaults(vector_store=self.vector_store)
-        self.index = VectorStoreIndex.from_vector_store(self.vector_store, storage_context=self.storage_context)
+QDRANT_URL = "http://qdrant:6333"
+COLLECTION_NAME = "tesvikler_v2"
 
-# services/rag_service/retrieval.py dosyasındaki fonksiyonun güncel hali:
+client = QdrantClient(url=QDRANT_URL)
 
-    def retrieve_context(self, query: str, program_name: str = None, top_k: int = 4) -> str:
-        """
-        Qdrant üzerinden ilgili döküman parçalarını (nodes/chunks) getirir.
-        Program adı belirtilmemişse genel veritabanı araması (filtresiz) yapar.
-        """
-        filtreler = None
-        
-        # Akıllı Filtre Kontrolü: 
-        # program_name None değilse, boş değilse ve Swagger'ın varsayılan "string" kelimesi değilse filtre uygula
-# services/rag_service/retrieval.py içindeki ilgili kısmı şu şekilde güncelleyin:
 
-        if program_name and program_name.strip() and program_name.lower() != "string":
-            filtreler = MetadataFilters(
-                # "program_adi" yerine "program_name" yapıyoruz (API Contract Uyumu)
-                filters=[MetadataFilter(key="program_name", value=program_name.strip())]
+def build_program_filter(program_ids: Optional[list[str]] = None) -> Optional[Filter]:
+    if not program_ids:
+        return None
+
+    return Filter(
+        must=[
+            FieldCondition(
+                key="program_id",
+                match=MatchAny(any=program_ids),
             )
-            print(f"🎯 RAG araması '{program_name}' programı için filtrelendi.")
-        else:
-            # Filtre None kalırsa Qdrant tüm koleksiyonda semantik arama yapar!
-            print("🌐 RAG araması genel veritabanı genelinde (filtresiz) yapılıyor.")
-            
-        retriever = self.index.as_retriever(similarity_top_k=top_k, filters=filtreler)
-        nodes = retriever.retrieve(query)
-        
-        context_text = "\n\n".join([node.node.get_content() for node in nodes])
-        return context_text
+        ]
+    )
+
+
+async def retrieve_chunks(
+    query: str,
+    top_k: int = 5,
+    program_ids: Optional[list[str]] = None,
+) -> list[SourceChunk]:
+    query_vector = await create_embedding(query)
+
+    query_result = client.query_points(
+        collection_name=COLLECTION_NAME,
+        query=query_vector,
+        limit=top_k,
+        query_filter=build_program_filter(program_ids),
+        with_payload=True,
+    )
+
+    results = query_result.points
+
+    chunks: list[SourceChunk] = []
+
+    for item in results:
+        payload = item.payload or {}
+
+        text = (
+            payload.get("text")
+            or payload.get("content")
+            or payload.get("chunk_text")
+            or payload.get("page_content")
+            or ""
+        )
+
+        if not text:
+            continue
+
+        chunks.append(
+            SourceChunk(
+                chunk_id=str(payload.get("chunk_id", item.id)),
+                program_id=payload.get("program_id"),
+                program_name=payload.get("program_name"),
+                text=text,
+                score=item.score,
+                source_file=payload.get("source_file"),
+                source_url=payload.get("source_url"),
+                metadata=payload.get("metadata", {}),
+            )
+        )
+
+    return chunks
+
+
+async def retrieve_chunks_for_matches(
+    matches: list[MatchResult],
+    user_message: str | None,
+    top_k: int,
+) -> list[SourceChunk]:
+    program_ids = [match.program_id for match in matches]
+
+    query_parts: list[str] = []
+
+    if user_message:
+        query_parts.append(user_message)
+
+    for match in matches:
+        query_parts.append(match.program_name)
+        query_parts.extend(match.match_reasons)
+
+    query = " ".join(query_parts)
+
+    return await retrieve_chunks(
+        query=query,
+        top_k=top_k,
+        program_ids=program_ids,
+    )

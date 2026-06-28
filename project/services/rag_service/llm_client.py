@@ -1,20 +1,36 @@
-from llama_index.llms.openai import OpenAI
-from llama_index.core import Settings
+import os
+from openai import AsyncOpenAI
 
-# LLM modeli ayarları
-Settings.llm = OpenAI(model="gpt-4o-mini", temperature=0.1)
+client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-class LlmClient:
-    def __init__(self):
-        self.llm = Settings.llm
+EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
+CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini")
 
-    def generate_stream(self, prompt: str):
-        """Canlı akış (Streaming) olarak kelime kelime yanıt üretir."""
-        response = self.llm.stream_complete(prompt)
-        for chunk in response:
-            yield chunk.delta
 
-    def generate_complete(self, prompt: str) -> str:
-        """Tek seferde tamamlanmış metin üretir."""
-        response = self.llm.complete(prompt)
-        return response.text
+async def create_embedding(text: str) -> list[float]:
+    response = await client.embeddings.create(
+        model=EMBEDDING_MODEL,
+        input=text,
+    )
+
+    return response.data[0].embedding
+
+
+async def generate_llm_answer(prompt: str) -> str:
+    response = await client.chat.completions.create(
+        model=CHAT_MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Sen Türkiye'deki teşvik ve destek programları hakkında "
+                    "belgeye dayalı cevap veren bir asistansın. "
+                    "Sadece verilen kaynaklara dayan. Emin değilsen belirt."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.2,
+    )
+
+    return response.choices[0].message.content or ""
