@@ -1,0 +1,61 @@
+{
+  "id": "kosgeb_girisim_sermayesi_yatirim_fonlari",
+  "institution": "KOSGEB",
+  "program_name": "Girişim Sermayesi Yatırım Fonları Yatırımları",
+
+  "purpose": "Ülkemizin kalkınma planları ve stratejik hedefleri doğrultusunda KOBİ’lerin uzun vadeli finansmana erişiminin kolaylaştırılması, teknoloji tabanlı girişimciliğin desteklenmesi, sanayide yeşil ve dijital dönüşümün hızlandırılması ve özel sermaye yatırımlarında kamu kaynağıyla kaldıraç etkisinin sağlanmasıdır.",
+
+  "application_requirements": [
+    "Kaynak aktarılacak fonun katılacağı her bir yatırım turunun asgari büyüklüğünün 50 milyon TL olması",
+    "Fon süresinin tasfiye dönemi dahil en fazla on iki yıl olması"
+  ],
+
+  "support_details": {
+    "max_commitment_amount": 500000000,
+    "currency": "TRY",
+    "rules": [
+      "Yerli yatırımcı taahhütlerinin %20'si ile sınırlı olmak üzere 200 milyon TL'ye kadar",
+      "Yabancı yatırımcı taahhüt tutarını aşmamak kaydıyla 200 milyon TL'ye kadar",
+      "Türkiye'deki girişimlere yapılan yabancı yatırım kadar olmak üzere 100 milyon TL'ye kadar"
+    ]
+  },
+
+  "legislation": [
+    {
+      "title": "Girişim Sermayesi Yatırım Fonları Yatırımlarına İlişkin Yönerge",
+      "url": "https://webdosya.kosgeb.gov.tr/Content/Upload/Dosya/Girişim_Sermayesi_Yatırım_Fonları_Yatırımlarına_İlişkin_Yönerge.pdf"
+    }
+  ],
+
+  "forms": [
+    {
+      "title": "Girişim Sermayesi Yatırım Fonları Yatırımları Kullanıcı Yetkilendirme Formu",
+      "url": "https://..."
+    },
+    {
+      "title": "Girişim Sermayesi Yatırım Fonları Yatırımları Başvuru Formu",
+      "url": "https://..."
+    }
+  ],
+
+  "faq": [
+    {
+      "question": "Programa kimler başvuru yapabilir?",
+      "answer": "Portföy Yönetim Şirketleri yöneticisi oldukları Girişim Sermayesi Yatırım Fonları için başvuruda bulunabilirler."
+    },
+    {
+      "question": "Nasıl başvuru yapılır?",
+      "answer": "Başvurular KOSGEB e-hizmetler menüsünden yapılır. Öncesinde Kullanıcı Yetkilendirme Formu gönderilmelidir."
+    },
+    {
+      "question": "Sektör sınırlaması var mı?",
+      "answer": "Sektör sınırlaması bulunmamaktadır ancak teknoloji ve katma değeri yüksek alanlara öncelik verilir."
+    },
+    {
+      "question": "Fon yatırımı için üst limit var mı?",
+      "answer": "Her bir fon için iştirak üst limiti 500 milyon TL'dir."
+    }
+  ],
+
+  "rag_text": "Girişim Sermayesi Yatırım Fonları Yatırımları programı KOSGEB tarafından yürütülmektedir. Programın amacı KOBİ'lerin uzun vadeli finansmana erişimini kolaylaştırmak, teknoloji tabanlı girişimciliği desteklemek ve yeşil-dijital dönüşümü hızlandırmaktır. Fonun yatırım turu büyüklüğü en az 50 milyon TL olmalıdır. Fon süresi en fazla 12 yıldır. Tek bir fona yapılabilecek azami taahhüt tutarı 500 milyon TL'dir."
+}

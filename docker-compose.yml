@@ -1,0 +1,40 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant_db
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  orchestration_service:
+    build:
+      context: .
+      dockerfile: services/orchestration_service/Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - MATCHING_SERVICE_URL=http://matching_service:8001
+      - RAG_SERVICE_URL=http://rag_service:8002
+    depends_on:
+      - matching_service
+
+  matching_service:
+    build:
+      context: .
+      dockerfile: services/matching_service/Dockerfile
+    container_name: matching_service
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+    depends_on:
+      - qdrant
+
+volumes:
+  qdrant_data:
