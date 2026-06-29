@@ -25,13 +25,36 @@ services:
     working_dir: /app/services/orchestration_service
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     env_file:
-      - .env  # Kök dizindeki .env dosyasını otomatik olarak işletim sistemi ortam değişkeni yapar
+      - .env
     environment:
       - PYTHONPATH=/app
       - MATCHING_SERVICE_URL=http://matching_service:8001
       - RAG_SERVICE_URL=http://rag_service:8002
     depends_on:
+      - matching_service
       - rag_service
+    networks:
+      - tesvik_network
+
+  matching_service:
+    build:
+      context: .
+      dockerfile: services/matching_service/Dockerfile
+    container_name: matching_service
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./services/matching_service:/app/services/matching_service
+      - ./shared:/app/shared
+    working_dir: /app/services/matching_service
+    command: uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+      - QDRANT_URL=http://qdrant:6333
+    depends_on:
+      - qdrant
     networks:
       - tesvik_network
 
@@ -48,7 +71,7 @@ services:
     working_dir: /app/services/rag_service
     command: uvicorn main:app --host 0.0.0.0 --port 8002 --reload
     env_file:
-      - .env  # Kök dizindeki .env dosyasını otomatik olarak işletim sistemi ortam değişkeni yapar
+      - .env
     environment:
       - PYTHONPATH=/app
       - QDRANT_URL=http://qdrant:6333
@@ -64,8 +87,12 @@ services:
     container_name: ingestion_service
     profiles:
       - setup
+    volumes:
+      - ./services/ingestion_service:/app/services/ingestion_service
+      - ./shared:/app/shared
+    working_dir: /app/services/ingestion_service
     env_file:
-      - .env  # Kök dizindeki .env dosyasını otomatik olarak işletim sistemi ortam değişkeni yapar
+      - .env
     environment:
       - PYTHONPATH=/app
       - QDRANT_URL=http://qdrant:6333

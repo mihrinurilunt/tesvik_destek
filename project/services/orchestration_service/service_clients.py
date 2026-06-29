@@ -240,3 +240,21 @@ async def call_rag_answer(request: RAGAnswerRequest) -> RAGResponse:
             message="RAG answer service beklenen response formatında veri döndürmedi.",
             details={"validation_error": str(exc)},
         ) from exc
+    
+async def call_pdf_generate(request: PDFGenerateRequest) -> httpx.Response:
+    """
+    rag_service /pdf/generate endpoint'ini çağırarak ham PDF yanıtını döner.
+    """
+    url = f"{settings.RAG_SERVICE_URL}/pdf/generate"
+    logger.info(f"Calling PDF generate service: {url}")
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                url,
+                json=request.model_dump(mode="json"),
+            )
+            response.raise_for_status()
+            return response
+    except Exception as exc:
+        logger.error(f"PDF generate service failed: {exc}")
+        raise

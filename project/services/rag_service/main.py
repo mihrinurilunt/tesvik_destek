@@ -1,149 +1,100 @@
-from __future__ import annotations
-
+import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-
-from services.rag_service.retrieval import RetrievalService
-from services.rag_service.prompt_builder import PromptBuilder
-from services.rag_service.llm_client import LLMClient
+from fastapi.middleware.cors import CORSMiddleware
 
 from shared.exceptions import AppException
 from shared.logger import get_logger
 from shared.response_utils import error_message
-from shared.schemas import (
-    RAGGenerateRequest,
-    RAGAnswerRequest,
-    RAGResponse,
-    HealthResponse
-)
+from shared.schemas import RAGGenerateRequest, RAGAnswerRequest, RAGResponse, HealthResponse
+from shared.constants import HEALTH_PATH, RAG_GENERATE_PATH, RAG_ANSWER_PATH
+
+from services.rag_service.llm_client import call_llm_generate, call_llm_answer
+from fastapi.responses import StreamingResponse
+from shared.schemas import PDFGenerateRequest
+from services.rag_service.pdf_generator import generate_recommendation_pdf
 
 logger = get_logger(__name__)
 
 app = FastAPI(
     title="RAG Service",
-    description="Qdrant döküman entegrasyonu ve LLM ile teşvik açıklaması üretme servisi.",
-    version="1.0.0"
+    description="Qdrant ve OpenAI destekli döküman sorgulama, akıllı fallback ve kişiselleştirilmiş teşvik analiz servisi.",
+    version="1.0.0",
 )
 
-# Servis bağımlılıkları başlatılıyor
-retrieval_service = RetrievalService()
-llm_client = LLMClient()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.exception_handler(AppException)
 async def app_exception_handler(request: Request, exc: AppException):
+    logger.error(f"Uygulama Hatası: {exc.message}")
     return JSONResponse(
         status_code=exc.status_code,
-        content=error_message(code=exc.error_code, message=exc.message, details=exc.details)
+        content=error_message(
+            code=exc.error_code,
+            message=exc.message,
+            details=exc.details,
+        ),
     )
 
-@app.get("/health", response_model=HealthResponse)
+
+@app.exception_handler(Exception)
+async def unexpected_exception_handler(request: Request, exc: Exception):
+    logger.exception("RAG Servisinde beklenmeyen sistem hatası")
+    return JSONResponse(
+        status_code=500,
+        content=error_message(
+            code="INTERNAL_SERVER_ERROR",
+            message="RAG servisinde beklenmeyen bir sistem hatası oluştu.",
+            details={"error": str(exc)},
+        ),
+    )
+
+
+@app.get(HEALTH_PATH, response_model=HealthResponse)
 async def health_check():
-    return HealthResponse(service="rag_service", status="ok")
+    return HealthResponse(
+        service="rag_service",
+        status="ok",
+    )
+
+@app.post("/pdf/generate")
+async def generate_pdf(request: PDFGenerateRequest):
+    """
+    Gelen analiz raporuna uygun PDF belgesi oluşturarak stream olarak döner.
+    """
+    logger.info("PDF generation request received")
+    pdf_buffer = generate_recommendation_pdf(
+        recommendation=request.recommendation,
+        sources=request.sources
+    )
+    
+    filename = f"tesvik_raporu_{request.recommendation.program_id}.pdf"
+    
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
-@app.post("/rag/generate", response_model=RAGResponse)
+@app.post(RAG_GENERATE_PATH, response_model=RAGResponse)
 async def rag_generate(request: RAGGenerateRequest):
-    """
-    Formdan gelen veya eşleşen desteklerin detaylı analizini yapar.
-    Adım adım başvuru kılavuzu hazırlar (PDF üretimi için hazırdır).
-    """
-    logger.info("RAG Generate isteği alındı.")
-    try:
-        program_ids = [m.program_id for m in request.matches]
-        
-        # 1. Eşleşen programlara ait detay dökümanlarını Qdrant'tan getiriyoruz
-        # 'query' olarak kullanıcının ihtiyaç alanlarını birleştirip arama terimi yapabiliriz
-        search_query = " ".join(request.user_profile.needs)
-        chunks = await retrieval_service.retrieve_relevant_chunks(
-            query=search_query,
-            program_ids=program_ids,
-            top_k=request.top_k_chunks
-        )
-
-        # 2. Promptları oluşturuyoruz
-        system_prompt = PromptBuilder.build_generation_system_prompt(request.language)
-        user_prompt = PromptBuilder.build_generation_user_prompt(
-            user_profile=request.user_profile,
-            matches=request.matches,
-            contexts=chunks
-        )
-
-        # 3. LLM ile yapılandırılmış veriyi üretiyoruz
-        summary, recommendations = await llm_client.generate_structured_recommendations(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt
-        )
-
-        # Her bir Recommendation nesnesine ilgili kaynak dökümanları bağlıyoruz
-        for rec in recommendations:
-            rec.sources = [c for c in chunks if c.program_id == rec.program_id]
-
-        return RAGResponse(
-            success=True,
-            message="Öneriler başarıyla detaylandırıldı.",
-            answer=summary,
-            recommendations=recommendations,
-            sources=chunks
-        )
-
-    except Exception as e:
-        logger.exception("RAG Generate akışında beklenmeyen hata")
-        return RAGResponse(
-            success=False,
-            message=f"Hata oluştu: {str(e)}",
-            answer="Teşvik detayları hazırlanırken teknik bir problem yaşandı.",
-            recommendations=[],
-            sources=[]
-        )
+    logger.info("RAG generate isteği alındı.")
+    return await call_llm_generate(request)
 
 
-@app.post("/rag/answer", response_model=RAGResponse)
+@app.post(RAG_ANSWER_PATH, response_model=RAGResponse)
 async def rag_answer(request: RAGAnswerRequest):
-    """
-    Kullanıcının chat içerisinden sorduğu soruları (Örn: 'KOSGEB için hangi belgeler lazım?')
-    Qdrant dökümanlarına bakarak doğal dille cevaplar.
-    """
-    logger.info(f"RAG Answer isteği alındı: {request.user_message}")
-    try:
-        # Eğer chat'te mevcut konuşmada eşleşen programlar varsa arama önceliğini onlara veriyoruz
-        program_ids = [m.program_id for m in request.current_matches] if request.current_matches else None
+    logger.info("RAG answer isteği alındı.")
+    return await call_llm_answer(request)
 
-        # 1. Soruya en yakın kılavuz parçalarını Qdrant'tan aratıyoruz
-        chunks = await retrieval_service.retrieve_relevant_chunks(
-            query=request.user_message,
-            program_ids=program_ids,
-            top_k=request.top_k_chunks
-        )
 
-        # 2. Promptları hazırlıyoruz
-        system_prompt = PromptBuilder.build_answer_system_prompt(request.language)
-        user_prompt = PromptBuilder.build_answer_user_prompt(
-            user_message=request.user_message,
-            contexts=chunks,
-            user_profile=request.user_profile
-        )
-
-        # 3. LLM yanıtı üretiyoruz
-        answer = await llm_client.generate_text_answer(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt
-        )
-
-        return RAGResponse(
-            success=True,
-            message="Soru başarıyla cevaplandı.",
-            answer=answer,
-            recommendations=[],
-            sources=chunks # Kullanıcıya hangi döküman parçalarından faydalandığımızı kaynak (metadata) olarak dönüyoruz
-        )
-
-    except Exception as e:
-        logger.exception("RAG Answer akışında beklenmeyen hata")
-        return RAGResponse(
-            success=False,
-            message=f"Hata oluştu: {str(e)}",
-            answer="Sorunuzu cevaplarken teknik bir problem yaşandı.",
-            recommendations=[],
-            sources=[]
-        )
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8002, reload=True)

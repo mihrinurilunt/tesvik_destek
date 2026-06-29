@@ -5,6 +5,11 @@ from services.orchestration_service.orchestrator import (
     handle_chat,
     handle_recommendation,
 )
+
+from shared.schemas import PDFGenerateRequest
+from fastapi.responses import StreamingResponse
+from services.orchestration_service.service_clients import call_pdf_generate
+
 from shared.constants import (
     CHAT_PATH,
     HEALTH_PATH,
@@ -45,6 +50,8 @@ async def app_exception_handler(request: Request, exc: AppException):
             details=exc.details,
         ),
     )
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Test aşamasında tüm kaynaklardan (HTML dosyası dahil) gelen isteklere izin verir
@@ -66,7 +73,19 @@ async def unexpected_exception_handler(request: Request, exc: Exception):
         ),
     )
 
-
+@app.post("/pdf/generate")
+async def generate_pdf(request: PDFGenerateRequest):
+    """
+    Frontend'den gelen PDF talebini RAG servisine yönlendirerek 
+    indirilebilir PDF dosyasını iletir.
+    """
+    response = await call_pdf_generate(request)
+    
+    return StreamingResponse(
+        response.iter_bytes(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=tesvik_raporu.pdf"}
+    )
 @app.get(HEALTH_PATH, response_model=HealthResponse)
 async def health_check():
     return HealthResponse(

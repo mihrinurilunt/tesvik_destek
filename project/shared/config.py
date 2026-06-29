@@ -39,6 +39,7 @@ class Settings(BaseSettings):
 
     # LLM ayarları
     LLM_PROVIDER: str = Field(default="openai")
+    LLM_MODEL: str = Field(default="gpt-4o-mini")
     LLM_MODEL_NAME: str = Field(default="gpt-4o-mini")
     OPENAI_API_KEY: str | None = None
     GEMINI_API_KEY: str | None = None

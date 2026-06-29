@@ -1,87 +1,85 @@
-"""
-Matching Service — FastAPI
-  GET  /health        → servis sağlık kontrolü
-  POST /find-matches  → profile en uygun programları bulur (top N, default 3)
-"""
-import json
-import os
-import traceback
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from typing import List
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
-from matcher import ProgramMatcher
-from schemas import MatchRequest, MatchResult, UserProfile, ProgramData
+# MatchResponse şeması içeriye aktarılıyor
+from shared.schemas import HealthResponse, MatchRequest, MatchResponse
+from shared.exceptions import AppException, MatchingException
+from shared.logger import get_logger
+from shared.response_utils import error_message
+from matcher import Matcher
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "data", "output.json")
-program_database: List[ProgramData] = []
+logger = get_logger(__name__)
+
+app = FastAPI(title="Matching Service", version="1.0.0")
+
+matcher = Matcher()
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global program_database
-    print(f"Program veritabanı yükleniyor: {DB_PATH}")
-    try:
-        with open(DB_PATH, "r", encoding="utf-8") as f:
-            raw_list = json.load(f)
-        loaded = []
-        for item in raw_list:
-            try:
-                loaded.append(ProgramData(**item))
-            except Exception:
-                pass
-        program_database = [p for p in loaded if p.program_name]
-        print(f"{len(program_database)} program başarıyla yüklendi.")
-    except FileNotFoundError:
-        print(f"UYARI: {DB_PATH} bulunamadı. Boş veritabanı ile başlatılıyor.")
-        program_database = []
-    yield
-    program_database.clear()
+@app.exception_handler(AppException)
+async def app_exception_handler(request: Request, exc: AppException):
+    logger.error(
+        "AppException raised",
+        extra={"error_code": exc.error_code, "err_message": exc.message, "details": exc.details},
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=error_message(
+            code=exc.error_code,
+            message=exc.message,
+            details=exc.details,
+        ),
+    )
 
 
-app = FastAPI(
-    title="Matching Service",
-    description="Kullanıcı profili ile destek programlarını eşleştiren servis",
-    version="2.0.0",
-    lifespan=lifespan,
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-matcher = ProgramMatcher()
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled exception in matching_service")
+    return JSONResponse(
+        status_code=500,
+        content=error_message(
+            code="INTERNAL_ERROR",
+            message="Beklenmeyen bir hata oluştu.",
+            details={"error": str(exc)},
+        ),
+    )
 
 
-@app.get("/health")
-def health():
-    return {
-        "status": "ok",
-        "service": "matching_service",
-        "programs_loaded": len(program_database),
-    }
-
-
-@app.post("/find-matches", response_model=List[MatchResult], summary="En Uygun Programları Bul")
-def find_best_matches(user_profile: UserProfile, limit: int = 3):
+# Geri dönüş tipi MatchResponse olarak güncellendi
+@app.post("/match", response_model=MatchResponse)
+async def match(request: MatchRequest) -> MatchResponse:
     """
-    Kullanıcı profiline göre veritabanındaki TÜM programlar
-    arasından en yüksek skorlu `limit` programı döndürür.
+    Kullanıcı profiline göre uygun teşvik/destek programlarını skorlar.
+    Orchestrator ile uyumlu MatchResponse döner.
     """
-    if not program_database:
-        raise HTTPException(status_code=503, detail="Program veritabanı boş veya yüklenmedi.")
+    logger.info(
+        "Match request received",
+        extra={
+            "sector": request.user_profile.sector,
+            "employee_count": request.user_profile.employee_count,
+            "top_k": request.top_k,
+        },
+    )
+
     try:
-        results = []
-        for program in program_database:
-            results.append(matcher.match(MatchRequest(
-                user_profile=user_profile,
-                program_data=program,
-            )))
-        results.sort(key=lambda r: r.score, reverse=True)
-        return results[:limit]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=traceback.format_exc())
+        matches = await matcher.find_matches(
+            user_profile=request.user_profile,
+            top_k=request.top_k,
+        )
+    except MatchingException:
+        raise
+    except Exception as exc:
+        logger.exception("Unexpected error during matching")
+        raise MatchingException(
+            message="Matching işlemi sırasında beklenmeyen bir hata oluştu.",
+            details={"service": "matching_service", "error": str(exc)},
+        ) from exc
+
+    logger.info("Matching completed", extra={"match_count": len(matches)})
+
+    # Sonucu MatchResponse formatında sarmalayarak dönüyoruz
+    return MatchResponse(success=True, matches=matches)
+
+
+@app.get("/health", response_model=HealthResponse)
+async def health() -> HealthResponse:
+    return HealthResponse(service="matching_service", status="ok")
