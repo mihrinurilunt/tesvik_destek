@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teşvik Destek Projesi - Test Arayüzü</title>
+    <!-- Tailwind CSS ile modern arayüz tasarımı -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col md:flex-row">
+
+    <!-- Sol Panel: Profil Tanımlama -->
+    <div class="w-full md:w-1/3 bg-white p-6 shadow-md border-r border-gray-200">
+        <h2 class="text-xl font-bold mb-4 text-gray-800">Şirket Profili</h2>
+        
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Sektör</label>
+                <input id="sector" type="text" value="Yazılım" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 border focus:bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Çalışan Sayısı</label>
+                <input id="employee_count" type="number" value="12" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 border focus:bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Yıllık Ciro (TL)</label>
+                <input id="annual_revenue" type="number" value="5000000" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 border focus:bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">İhtiyaç Alanları (Virgülle Ayırın)</label>
+                <input id="needs" type="text" value="Ar-Ge, İstihdam" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 border focus:bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Şehir</label>
+                <input id="city" type="text" value="İstanbul" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 border focus:bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Şirket Türü</label>
+                <input id="company_type" type="text" value="Limited" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 border focus:bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Açıklama</label>
+                <textarea id="description" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 border focus:bg-white" rows="2">Yazılım geliştirme ve Ar-Ge çalışmaları yürüten startup.</textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sağ Panel: Chat Ekranı -->
+    <div class="flex-1 flex flex-col h-screen">
+        <div class="bg-gray-800 p-4 text-white font-bold flex justify-between items-center shadow-md">
+            <span>Orchestration Service Chat - localhost:8000</span>
+            <span class="text-xs text-green-400 bg-green-950 px-2 py-1 rounded">Aktif</span>
+        </div>
+
+        <!-- Mesaj Geçmişi -->
+        <div id="chat-box" class="flex-1 p-6 overflow-y-auto space-y-4 bg-gray-50">
+            <div class="flex items-start gap-2 max-w-xl">
+                <div class="bg-gray-200 text-gray-800 p-3 rounded-lg shadow-sm text-sm">
+                    Merhaba! Ben teşvik ve devlet destekleri asistanıyım. Şirket profilinize göre uygun destekleri bulabilir veya merak ettiğiniz belgeleri/şartları cevaplayabilirim.
+                </div>
+            </div>
+        </div>
+
+        <!-- Giriş Alanı -->
+        <div class="p-4 bg-white border-t border-gray-200 flex gap-2">
+            <input id="user-input" type="text" placeholder="Mesajınızı buraya yazın..." class="flex-1 rounded-md border border-gray-300 p-3 focus:outline-none focus:border-blue-500" onkeydown="if(event.key === 'Enter') sendMessage()">
+            <button onclick="sendMessage()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2 rounded-md transition">Gönder</button>
+        </div>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        let currentMatches = [];
+        let currentRecommendations = [];
+
+        async function sendMessage() {
+            const inputField = document.getElementById('user-input');
+            const message = inputField.value.trim();
+            if (!message) return;
+
+            // Kullanıcı mesajını ekrana ekleme
+            appendMessage(message, 'user');
+            inputField.value = '';
+
+            // Şirket profil verilerini toplama
+            const userProfile = {
+                sector: document.getElementById('sector').value,
+                employee_count: parseInt(document.getElementById('employee_count').value) || 0,
+                annual_revenue: parseFloat(document.getElementById('annual_revenue').value) || 0,
+                needs: document.getElementById('needs').value.split(',').map(n => n.trim()).filter(Boolean),
+                city: document.getElementById('city').value,
+                company_type: document.getElementById('company_type').value,
+                description: document.getElementById('description').value
+            };
+
+            const payload = {
+                message: message,
+                user_profile: userProfile,
+                current_matches: currentMatches,
+                current_recommendations: currentRecommendations,
+                conversation_id: "conv-web-test",
+                language: "tr"
+            };
+
+            // Loading animasyonu
+            const loaderId = appendMessage("Düşünülüyor...", 'assistant-loading');
+
+            try {
+                const response = await fetch('http://localhost:8000/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                document.getElementById(loaderId).remove();
+
+                if (data.success) {
+                    appendMessage(data.answer, 'assistant', data.sources);
+                    
+                    // Chat oturumu boyunca bağlamı korumak için listeleri güncelliyoruz
+                    if (data.matches && data.matches.length > 0) {
+                        currentMatches = data.matches;
+                    }
+                    if (data.recommendations && data.recommendations.length > 0) {
+                        currentRecommendations = data.recommendations;
+                    }
+                } else {
+                    appendMessage("Bir sorun oluştu: " + (data.message || "Bilinmeyen hata"), 'assistant-error');
+                }
+            } catch (err) {
+                document.getElementById(loaderId).remove();
+                appendMessage("Orchestration Service'e bağlanılamadı. Lütfen Docker konteynerinizin (port 8000) açık olduğundan emin olun.", 'assistant-error');
+            }
+        }
+
+        function appendMessage(text, sender, sources = []) {
+            const msgDiv = document.createElement('div');
+            const uniqueId = 'msg-' + Math.random().toString(36).substr(2, 9);
+            msgDiv.id = uniqueId;
+            msgDiv.className = "flex gap-2 max-w-2xl text-sm " + (sender === 'user' ? "justify-end ml-auto" : "items-start");
+
+            let textClass = sender === 'user' 
+                ? "bg-blue-600 text-white p-3 rounded-lg shadow-sm" 
+                : sender === 'assistant-error'
+                ? "bg-red-100 text-red-800 p-3 rounded-lg shadow-sm border border-red-200"
+                : "bg-white text-gray-800 p-4 rounded-lg shadow-sm border border-gray-200";
+
+            let innerHTML = `<div class="${textClass} whitespace-pre-line">${text}`;
+            
+            // Eğer varsa kaynak dökümanları listeleme
+            if (sources && sources.length > 0) {
+                innerHTML += `<div class="mt-3 pt-2 border-t border-gray-100 text-xs text-gray-500"><strong>Kaynaklar:</strong><ul class="list-disc list-inside mt-1">`;
+                sources.forEach(src => {
+                    innerHTML += `<li>${src.source_file || 'Döküman'} (Skor: %${Math.round(src.score * 100)})</li>`;
+                });
+                innerHTML += `</ul></div>`;
+            }
+            
+            innerHTML += `</div>`;
+            msgDiv.innerHTML = innerHTML;
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            return uniqueId;
+        }
+    </script>
+</body>
+</html>

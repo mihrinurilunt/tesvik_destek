@@ -46,6 +46,7 @@ GREETING_KEYWORDS = (
     "günaydın",
     "iyi aksamlar",
     "iyi akşamlar",
+    "iyi çalişmalar",
 )
 
 # Sistem hakkında genel sorular.

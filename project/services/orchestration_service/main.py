@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from services.orchestration_service.orchestrator import (
     handle_chat,
     handle_recommendation,
@@ -44,7 +45,13 @@ async def app_exception_handler(request: Request, exc: AppException):
             details=exc.details,
         ),
     )
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Test aşamasında tüm kaynaklardan (HTML dosyası dahil) gelen isteklere izin verir
+    allow_credentials=True,
+    allow_methods=["*"],  # GET, POST, OPTIONS vb. tüm metodlara izin verir
+    allow_headers=["*"],  # Tüm HTTP başlıklarına izin verir
+)
 
 @app.exception_handler(Exception)
 async def unexpected_exception_handler(request: Request, exc: Exception):

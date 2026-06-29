@@ -24,6 +24,8 @@ services:
       - ./shared:/app/shared
     working_dir: /app/services/orchestration_service
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    env_file:
+      - .env  # Kök dizindeki .env dosyasını otomatik olarak işletim sistemi ortam değişkeni yapar
     environment:
       - PYTHONPATH=/app
       - MATCHING_SERVICE_URL=http://matching_service:8001
@@ -45,10 +47,11 @@ services:
       - ./shared:/app/shared
     working_dir: /app/services/rag_service
     command: uvicorn main:app --host 0.0.0.0 --port 8002 --reload
+    env_file:
+      - .env  # Kök dizindeki .env dosyasını otomatik olarak işletim sistemi ortam değişkeni yapar
     environment:
       - PYTHONPATH=/app
       - QDRANT_URL=http://qdrant:6333
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       - qdrant
     networks:
@@ -61,10 +64,11 @@ services:
     container_name: ingestion_service
     profiles:
       - setup
+    env_file:
+      - .env  # Kök dizindeki .env dosyasını otomatik olarak işletim sistemi ortam değişkeni yapar
     environment:
       - PYTHONPATH=/app
       - QDRANT_URL=http://qdrant:6333
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       - qdrant
     networks:

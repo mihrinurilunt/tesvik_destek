@@ -14,7 +14,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # Hem bulunulan klasördeki .env'ye bakar, hem de iki üst dizindeki (kök dizin) .env'ye bakar.
+        env_file=(".env", "../../.env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -31,7 +32,7 @@ class Settings(BaseSettings):
 
     # Qdrant ayarları
     QDRANT_URL: str = Field(default="http://qdrant:6333")
-    QDRANT_COLLECTION_NAME: str = Field(default="tesvik_program_chunks")
+    QDRANT_COLLECTION_NAME: str = Field(default="tesvikler_v2")
 
     # Embedding ayarları
     EMBEDDING_MODEL_NAME: str = Field(default="sentence-transformers/all-MiniLM-L6-v2")
