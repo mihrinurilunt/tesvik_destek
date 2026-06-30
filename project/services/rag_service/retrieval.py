@@ -35,15 +35,13 @@ async def get_embedding(text: str) -> List[float]:
         raise e
 
 
+# services/rag_service/retrieval.py içindeki retrieve_chunks fonksiyonu:
+
 async def retrieve_chunks(
     query_text: str,
     top_k: int = 5,
     program_id: Optional[str] = None
 ) -> List[SourceChunk]:
-    """
-    Qdrant veritabanında benzerlik araması gerçekleştirir. 
-    Gerektiğinde program_id parametresi ile sadece ilgili teşvik dökümanı filtrelenebilir.
-    """
     try:
         vector = await get_embedding(query_text)
         
@@ -58,18 +56,29 @@ async def retrieve_chunks(
                 ]
             )
             
-        search_results = qdrant_client.search(
-            collection_name="tesvikler_v2",
-            query_vector=vector,
-            limit=top_k,
-            query_filter=qdrant_filter
-        )
-        
+        search_results = []
+        try:
+            # 1. Tercih: Güncel qdrant-client sürümleri için query_points API (v1.10+)
+            response = qdrant_client.query_points(
+                collection_name="tesvikler_v2",
+                query=vector,
+                limit=top_k,
+                query_filter=qdrant_filter
+            )
+            search_results = response.points
+        except AttributeError:
+            # 2. Tercih: Eski qdrant-client sürümleri için fallback/search metodu
+            search_results = qdrant_client.search(
+                collection_name="tesvikler_v2",
+                query_vector=vector,
+                limit=top_k,
+                query_filter=qdrant_filter
+            )
+            
         sources = []
         for hit in search_results:
             payload = hit.payload or {}
             
-            # LlamaIndex'in döküman saklama biçimlerine (text veya _node_content) göre içerik ayıklanır
             raw_text = payload.get("text")
             if not raw_text and "_node_content" in payload:
                 try:
@@ -81,7 +90,6 @@ async def retrieve_chunks(
             if not raw_text:
                 raw_text = ""
 
-            # URL verilerinin validasyonu
             validated_app_url = None
             app_url = payload.get("application_url")
             if app_url:
