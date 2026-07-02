@@ -152,13 +152,34 @@ async def call_llm_generate(request: RAGGenerateRequest) -> RAGResponse:
     )
 
 
+# services/rag_service/llm_client.py içindeki call_llm_answer fonksiyonunun güncel hali:
+
 async def call_llm_answer(request: RAGAnswerRequest) -> RAGResponse:
     """
-    /rag/answer akışını yönetir. Döküman bağlamına dayalı veya fallback ile yanıt döner.
+    Kullanıcı sorusuna bağlamsal veya genel yanıt üretir.
+    Sorgu zenginleştirme (Query Enrichment) mekanizması ile metadata uyuşmazlıklarında dahi
+    doğru programa odaklanılmasını garanti eder.
     """
+    program_id = None
+    focused_program_name = None
+    query_text = request.user_message  # Orijinal kullanıcı mesajı
+    
+    # Odaklanılmış bir program var mı kontrol et
+    if request.current_matches and len(request.current_matches) == 1:
+        program_id = request.current_matches[0].program_id
+        focused_program_name = request.current_matches[0].program_name
+        logger.info(f"RAG odaklanılan program: '{focused_program_name}' (ID: {program_id})")
+        
+        # SORGU ZENGİNLEŞTİRME (Query Enrichment)
+        # Kullanıcının "bu desteğe..." gibi zamirler barındıran sorusunu program adıyla birleştiriyoruz.
+        # Bu sayede vektör araması doğrudan ilgili programın döküman parçalarına yönlenir.
+        query_text = f"{focused_program_name} - {request.user_message}"
+
+    # Retrieval aşamasına filtrelenmiş veya zenginleştirilmiş sorguyu paslıyoruz
     chunks = await retrieve_chunks(
-        query_text=request.user_message,
-        top_k=request.top_k_chunks
+        query_text=query_text, # Zenginleştirilmiş sorgu metni gönderiliyor
+        top_k=request.top_k_chunks,
+        program_id=program_id
     )
     
     context_text = ""
@@ -167,15 +188,21 @@ async def call_llm_answer(request: RAGAnswerRequest) -> RAGResponse:
             [f"--- Kaynak {i+1} (Belge: {c.program_name or 'Belirtilmemiş'}) ---\n{c.text}" for i, c in enumerate(chunks)]
         )
     else:
-        context_text = "Veritabanında doğrudan eşleşen bir döküman bulunamadı."
+        context_text = "Veritabanında doğrudan eşleşen herhangi bir resmi döküman kaydı bulunamadı."
         
-    prompt = build_answer_prompt(request.user_message, context_text, request.user_profile)
+    # Prompt builder fonksiyonuna odaklanılan program ismini paslıyoruz
+    prompt = build_answer_prompt(
+        user_message=request.user_message, # LLM'e sadece orijinal soruyu gösteriyoruz
+        context_text=context_text, 
+        profile=request.user_profile,
+        focused_program_name=focused_program_name
+    )
     
     try:
         response = await openai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "Sen dürüst ve resmi bir devlet destekleri uzmanı asistanısın."},
+                {"role": "system", "content": "Sen dürüst, resmi ve her zaman gerçekçi bir asistanısın."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.3
@@ -189,10 +216,10 @@ async def call_llm_answer(request: RAGAnswerRequest) -> RAGResponse:
             sources=chunks
         )
     except Exception as e:
-        logger.error(f"Soru-cevap sürecinde LLM hatası: {e}")
+        logger.error(f"Answer LLM üretim hatası: {e}")
         return RAGResponse(
             success=False,
-            answer="Sorunuzu işlerken teknik bir problem yaşandı. Lütfen daha sonra tekrar deneyiniz.",
+            answer="Üzgünüm, sorunuzu işlerken teknik bir problem yaşandı. Lütfen daha sonra tekrar deneyiniz.",
             recommendations=[],
             sources=[]
         )
