@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teşvik Destek Asistanı</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.460.0/dist/umd/lucide.js"></script>
+<style>
+    html, body { height: 100%; margin: 0; padding: 0; }
+    body {
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        background-color: #ffffff;
+        color: #141e39;
+    }
+    
+    @keyframes blobFloat1 {
+        0%, 100% { transform: translate(0, 0) scale(1); }
+        33% { transform: translate(40px, -60px) scale(1.1); }
+        66% { transform: translate(-30px, 30px) scale(0.95); }
+    }
+    @keyframes blobFloat2 {
+        0%, 100% { transform: translate(0, 0) scale(1); }
+        33% { transform: translate(-50px, 40px) scale(0.9); }
+        66% { transform: translate(40px, -20px) scale(1.08); }
+    }
+    @keyframes blobFloat3 {
+        0%, 100% { transform: translate(0, 0) scale(1); }
+        50% { transform: translate(-30px, -40px) scale(1.12); }
+    }
+    .blob-1 { animation: blobFloat1 16s ease-in-out infinite; }
+    .blob-2 { animation: blobFloat2 19s ease-in-out infinite; }
+    .blob-3 { animation: blobFloat3 14s ease-in-out infinite; }
+
+    @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(18px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up { animation: fadeUp 0.6s cubic-bezier(.16,.84,.44,1) both; }
+    .fade-up-1 { animation-delay: .05s; }
+    .fade-up-2 { animation-delay: .15s; }
+    .fade-up-3 { animation-delay: .25s; }
+
+    .drawer-open { transform: translateX(0) !important; }
+
+    .fade-in-delayed {
+        animation: fadeUp 0.4s ease-out forwards;
+    }
+</style>
+</head>
+<body class="selection:bg-[#287fc7] selection:text-white pt-16">
+
+<!-- ============ SABİT NAVİGASYON ÇUBUĞU (NAVBAR) ============ -->
+<nav class="fixed top-0 left-0 w-full h-16 z-40 bg-white/80 backdrop-blur-md border-b border-[#141e39]/10 px-6 md:px-12 flex justify-between items-center transition-all">
+    <!-- Logo / Ana Sayfa Linki -->
+    <div onclick="showPage('hero-page')" class="flex items-center gap-2 cursor-pointer group">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-r from-[#287fc7] to-[#27a9bb] flex items-center justify-center shadow-md shadow-[#287fc7]/15 group-hover:opacity-90 transition">
+            <i data-lucide="award" class="w-5 h-5 text-white"></i>
+        </div>
+        <span class="font-extrabold text-lg text-[#141e39] tracking-tight">
+            Hibe<span class="bg-gradient-to-r from-[#287fc7] to-[#27a9bb] bg-clip-text text-transparent">AI</span>
+        </span>
+    </div>
+
+    <!-- Giriş Yapıldığında Görünecek Sayfa Geçiş Menüsü -->
+    <div id="nav-pages-menu" class="hidden md:flex items-center gap-1 bg-[#141e39]/5 p-1 rounded-xl border border-[#141e39]/10 text-xs font-semibold">
+        <button onclick="showPage('hero-page')" id="nav-btn-hero-page" class="px-3 py-1.5 rounded-lg transition bg-white text-[#287fc7] shadow-sm">Ana Sayfa</button>
+        <button onclick="showPage('form-page')" id="nav-btn-form-page" class="px-3 py-1.5 rounded-lg transition border border-transparent text-[#141e39]/70 hover:text-[#141e39]">Profil Formu</button>
+        <button onclick="showPage('results-page')" id="nav-btn-results-page" class="px-3 py-1.5 rounded-lg transition border border-transparent text-[#141e39]/70 hover:text-[#141e39]">Teşvik Sonuçları</button>
+        <button onclick="showPage('chat-page')" id="nav-btn-chat-page" class="px-3 py-1.5 rounded-lg transition border border-transparent text-[#141e39]/70 hover:text-[#141e39]">Sohbet Asistanı</button>
+    </div>
+
+    <!-- Giriş Yapılmadığında Görünecek Butonlar -->
+    <div id="nav-auth-buttons" class="flex items-center gap-2">
+        <button onclick="openAuthModal('login')" class="text-sm font-semibold text-[#141e39]/70 hover:text-[#141e39] transition px-4 py-2">
+            Giriş Yap
+        </button>
+        <button onclick="openAuthModal('register')" class="bg-gradient-to-r from-[#287fc7] to-[#27a9bb] hover:opacity-90 text-white text-sm font-bold px-5 py-2 rounded-xl transition shadow-md shadow-[#287fc7]/10">
+            Kayıt Ol
+        </button>
+    </div>
+
+    <!-- Giriş Yapıldığında Görünecek Kullanıcı Alanı -->
+    <div id="nav-user-profile" class="hidden flex items-center gap-3">
+        <div class="flex items-center gap-2 bg-[#141e39]/5 px-3 py-1.5 rounded-xl border border-[#141e39]/10">
+            <div class="w-6 h-6 rounded-full bg-gradient-to-r from-[#287fc7] to-[#27a9bb] flex items-center justify-center text-[10px] text-white font-bold" id="user-avatar">
+                K
+            </div>
+            <span class="text-xs font-semibold text-[#141e39]" id="user-display-name">Kullanıcı</span>
+        </div>
+        <button onclick="logout()" class="text-xs font-semibold text-red-600 hover:text-red-700 transition flex items-center gap-1 p-1.5 rounded-lg hover:bg-red-50">
+            <i data-lucide="log-out" class="w-4 h-4"></i>
+            <span class="hidden sm:inline">Çıkış</span>
+        </button>
+    </div>
+</nav>
+
+<!-- ============ SAYFA 1: HERO (ANA SAYFA) ============ -->
+<main id="hero-page" class="app-page flex min-h-[calc(100vh-4rem)] items-center justify-center relative overflow-hidden bg-white px-6 py-12">
+    <!-- Arka plan renkli yuvarlaklar -->
+    <div class="absolute -top-32 -left-24 w-[28rem] h-[28rem] rounded-full bg-[#287fc7]/20 blur-3xl blob-1 pointer-events-none"></div>
+    <div class="absolute top-1/3 -right-24 w-[26rem] h-[26rem] rounded-full bg-[#27a9bb]/20 blur-3xl blob-2 pointer-events-none"></div>
+    <div class="absolute -bottom-32 left-1/4 w-[24rem] h-[24rem] rounded-full bg-[#141e39]/5 blur-3xl blob-3 pointer-events-none"></div>
+
+    <div class="relative z-10 max-w-3xl mx-auto text-center">
+        <div class="fade-up fade-up-1 inline-flex items-center gap-2 mb-6 text-xs font-semibold text-[#287fc7] bg-[#287fc7]/10 border border-[#287fc7]/20 px-4 py-1.5 rounded-full">
+            <span class="w-2 h-2 rounded-full bg-[#27a9bb] animate-pulse"></span>
+            <span id="welcome-badge-text">Keşfetmeye Hazır Mısınız?</span>
+        </div>
+        <h1 class="fade-up fade-up-2 text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.05]">
+            Size uygun
+            <span class="bg-gradient-to-r from-[#287fc7] to-[#27a9bb] bg-clip-text text-transparent">teşviki</span>
+            <br class="hidden md:block">
+            birlikte bulalım.
+        </h1>
+        <p class="fade-up fade-up-3 mt-6 text-base md:text-lg text-[#141e39]/60 max-w-xl mx-auto leading-relaxed">
+            Birkaç soruyu yanıtlayın, işletmenize en uygun devlet teşviklerini ve destek programlarını
+            saniyeler içinde sizin için listeleyelim. Karmaşık formlar yok, sade ve hızlı.
+        </p>
+
+        <div class="fade-up fade-up-3 mt-10 flex items-center justify-center gap-4 flex-wrap">
+            <button onclick="showPage('form-page')" class="bg-gradient-to-r from-[#287fc7] to-[#27a9bb] hover:opacity-90 text-white font-bold px-7 py-3.5 rounded-xl transition shadow-lg shadow-[#287fc7]/20 flex items-center gap-2">
+                Formu Doldur
+                <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+            </button>
+            <button onclick="showPage('chat-page')" class="bg-white hover:bg-[#141e39]/5 text-[#141e39] font-bold px-7 py-3.5 rounded-xl transition border border-[#141e39]/15 flex items-center gap-2">
+                Sohbete Başla
+                <i data-lucide="message-circle" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </div>
+</main>
+
+<!-- ============ SAYFA 2: FORM SAYFASI ============ -->
+<main id="form-page" class="app-page hidden min-h-[calc(100vh-4rem)] flex-col bg-slate-50/40">
+    <div class="px-6 md:px-12 py-4 border-b border-[#141e39]/10 bg-white flex justify-between items-center shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-r from-[#287fc7] to-[#27a9bb] flex items-center justify-center shadow-sm">
+                <i data-lucide="clipboard-list" class="w-5 h-5 text-white"></i>
+            </div>
+            <div>
+                <h1 class="text-base font-bold text-[#141e39]">Şirket Profili & Bilgi Formu</h1>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-[#27a9bb]"></span>
+                    <span class="text-[10px] text-[#141e39]/60 font-semibold">Girdiğiniz bilgilere uyan aktif devlet teşvikleri taranacaktır</span>
+                </div>
+            </div>
+        </div>
+        <button onclick="showPage('hero-page')" class="flex items-center gap-1.5 bg-[#141e39]/5 hover:bg-[#141e39]/10 text-xs font-semibold px-3.5 py-2 rounded-xl transition border border-[#141e39]/10 text-[#141e39]/70">
+            <i data-lucide="arrow-left" class="w-4 h-4"></i>
+            Geri Dön
+        </button>
+    </div>
+
+    <!-- Form İçeriği -->
+    <div class="flex-1 py-10 px-6 flex justify-center overflow-y-auto">
+        <div class="w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-[#141e39]/5 p-8 md:p-10">
+            <div class="flex items-center gap-2 mb-1.5">
+                <i data-lucide="briefcase" class="w-5 h-5 text-[#287fc7]"></i>
+                <span class="text-xs font-bold uppercase tracking-wider text-[#287fc7]">Şirket Profili</span>
+            </div>
+            <h2 class="text-2xl md:text-3xl font-extrabold mb-1">Bize biraz işletmenizden bahsedin</h2>
+            <p class="text-sm text-[#141e39]/50 mb-8">Bu bilgiler, yapay zekanın size en uygun teşvikleri analiz etmesini sağlar.</p>
+
+            <div class="space-y-6 text-xs">
+                <!-- Sektör ve Kurumsal -->
+                <div class="p-5 rounded-2xl border border-[#141e39]/10 bg-[#141e39]/[0.01] space-y-4">
+                    <h3 class="text-xs font-extrabold uppercase tracking-wider text-[#141e39]/60 mb-2">1. Genel Kurumsal Bilgiler</h3>
+                    <div>
+                        <label class="block font-semibold text-[#141e39]/60 mb-1">Sektör</label>
+                        <div class="relative mt-1">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#141e39]/40">
+                                <i data-lucide="briefcase" class="w-4 h-4"></i>
+                            </div>
+                            <select id="sector" class="w-full rounded-xl border border-[#141e39]/15 bg-white pl-10 pr-3 py-3 text-sm text-[#141e39] focus:ring-2 focus:ring-[#27a9bb]/40 focus:outline-none focus:border-[#27a9bb] transition-all appearance-none cursor-pointer">
+                                <option>Yazılım / Bilgi Teknolojileri</option>
+                                <option>İmalat Sanayi</option>
+                                <option>Tekstil ve Hazır Giyim</option>
+                                <option>Gıda ve İçecek</option>
+                                <option>Tarım ve Hayvancılık</option>
+                                <option>Turizm ve Konaklama</option>
+                                <option>Sağlık</option>
+                                <option>Enerji</option>
+                                <option>İnşaat</option>
+                                <option>Lojistik ve Ulaştırma</option>
+                                <option>Eğitim</option>
+                                <option>Finans</option>
+                                <option>Ar-Ge ve İnovasyon</option>
+                                <option>Diğer</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block font-semibold text-[#141e39]/60 mb-1">Şehir</label>
+                            <div class="relative mt-1">
+                                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#141e39]/40">
+                                    <i data-lucide="map-pin" class="w-4 h-4"></i>
+                                </div>
+                                <select id="city" class="w-full rounded-xl border border-[#141e39]/15 bg-white pl-10 pr-3 py-3 text-sm text-[#141e39] focus:ring-2 focus:ring-[#27a9bb]/40 focus:outline-none focus:border-[#27a9bb] transition-all appearance-none cursor-pointer">
+                                    <option>İstanbul</option>
+                                    <option>Ankara</option>
+                                    <option>İzmir</option>
+                                    <option>Bursa</option>
+                                    <option>Antalya</option>
+                                    <option>Adana</option>
+                                    <option>Konya</option>
+                                    <option>Gaziantep</option>
+                                    <option>Kayseri</option>
+                                    <option>Kocaeli</option>
+                                    <option>Mersin</option>
+                                    <option>Eskişehir</option>
+                                    <option>Trabzon</option>
+                                    <option>Samsun</option>
+                                    <option>Diğer</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-[#141e39]/60 mb-1">Şirket Türü</label>
+                            <div class="relative mt-1">
+                                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#141e39]/40">
+                                    <i data-lucide="building" class="w-4 h-4"></i>
+                                </div>
+                                <select id="company_type" class="w-full rounded-xl border border-[#141e39]/15 bg-white pl-10 pr-3 py-3 text-sm text-[#141e39] focus:ring-2 focus:ring-[#27a9bb]/40 focus:outline-none focus:border-[#27a9bb] transition-all appearance-none cursor-pointer">
+                                    <option>Şahıs Şirketi</option>
+                                    <option selected>Limited</option>
+                                    <option>Anonim</option>
+                                    <option>Kooperatif</option>
+                                    <option>Şube</option>
+                                    <option>Diğer</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Finansal ve Operasyonel -->
+                <div class="p-5 rounded-2xl border border-[#141e39]/10 bg-[#141e39]/[0.01] space-y-4">
+                    <h3 class="text-xs font-extrabold uppercase tracking-wider text-[#141e39]/60 mb-2">2. Operasyonel ve Finansal Ölçek</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block font-semibold text-[#141e39]/60 mb-1">Çalışan Sayısı</label>
+                            <div class="relative mt-1">
+                                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#141e39]/40">
+                                    <i data-lucide="users" class="w-4 h-4"></i>
+                                </div>
+                                <input id="employee_count" type="number" value="12" class="w-full rounded-xl border border-[#141e39]/15 bg-white pl-10 pr-3 py-3 text-sm text-[#141e39] focus:ring-2 focus:ring-[#27a9bb]/40 focus:outline-none focus:border-[#27a9bb] transition-all">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-[#141e39]/60 mb-1">Yıllık Ciro (TL)</label>
+                            <div class="relative mt-1">
+                                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#141e39]/40">
+                                    <span class="font-bold text-sm">₺</span>
+                                </div>
+                                <input id="annual_revenue" type="number" value="5000000" class="w-full rounded-xl border border-[#141e39]/15 bg-white pl-10 pr-3 py-3 text-sm text-[#141e39] focus:ring-2 focus:ring-[#27a9bb]/40 focus:outline-none focus:border-[#27a9bb] transition-all">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Öncelikler -->
+                <div class="p-5 rounded-2xl border border-[#141e39]/10 bg-[#141e39]/[0.01] space-y-4">
+                    <h3 class="text-xs font-extrabold uppercase tracking-wider text-[#141e39]/60 mb-2">3. İhtiyaç Alanları ve Faaliyet Detayları</h3>
+                    <div>
+                        <label class="block font-semibold text-[#141e39]/60 mb-2">Hangi Alanlarda Destek Arıyorsunuz?</label>
+                        <div id="needs" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                            <label class="relative flex items-center gap-2.5 p-3 rounded-xl border border-[#141e39]/10 bg-white hover:bg-slate-50 cursor-pointer transition-all select-none">
+                                <input type="checkbox" value="Ar-Ge" class="needs-checkbox peer sr-only" checked>
+                                <div class="w-4.5 h-4.5 rounded-lg border border-[#141e39]/20 flex items-center justify-center bg-white peer-checked:bg-[#287fc7] peer-checked:border-[#287fc7] transition shrink-0">
+                                    <svg class="w-3 h-3 text-white hidden peer-checked:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                                <span class="font-bold text-xs text-[#141e39]/60 peer-checked:text-[#141e39] transition-all">Ar-Ge</span>
+                            </label>
+                            
+                            <label class="relative flex items-center gap-2.5 p-3 rounded-xl border border-[#141e39]/10 bg-white hover:bg-slate-50 cursor-pointer transition-all select-none">
+                                <input type="checkbox" value="İstihdam" class="needs-checkbox peer sr-only" checked>
+                                <div class="w-4.5 h-4.5 rounded-lg border border-[#141e39]/20 flex items-center justify-center bg-white peer-checked:bg-[#287fc7] peer-checked:border-[#287fc7] transition shrink-0">
+                                    <svg class="w-3 h-3 text-white hidden peer-checked:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                                <span class="font-bold text-xs text-[#141e39]/60 peer-checked:text-[#141e39] transition-all">İstihdam</span>
+                            </label>
+
+                            <label class="relative flex items-center gap-2.5 p-3 rounded-xl border border-[#141e39]/10 bg-white hover:bg-slate-50 cursor-pointer transition-all select-none">
+                                <input type="checkbox" value="Yatırım" class="needs-checkbox peer sr-only">
+                                <div class="w-4.5 h-4.5 rounded-lg border border-[#141e39]/20 flex items-center justify-center bg-white peer-checked:bg-[#287fc7] peer-checked:border-[#287fc7] transition shrink-0">
+                                    <svg class="w-3 h-3 text-white hidden peer-checked:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                                <span class="font-bold text-xs text-[#141e39]/60 peer-checked:text-[#141e39] transition-all">Yatırım</span>
+                            </label>
+
+                            <label class="relative flex items-center gap-2.5 p-3 rounded-xl border border-[#141e39]/10 bg-white hover:bg-slate-50 cursor-pointer transition-all select-none">
+                                <input type="checkbox" value="İhracat" class="needs-checkbox peer sr-only">
+                                <div class="w-4.5 h-4.5 rounded-lg border border-[#141e39]/20 flex items-center justify-center bg-white peer-checked:bg-[#287fc7] peer-checked:border-[#287fc7] transition shrink-0">
+                                    <svg class="w-3 h-3 text-white hidden peer-checked:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                                <span class="font-bold text-xs text-[#141e39]/60 peer-checked:text-[#141e39] transition-all">İhracat</span>
+                            </label>
+
+                            <label class="relative flex items-center gap-2.5 p-3 rounded-xl border border-[#141e39]/10 bg-white hover:bg-slate-50 cursor-pointer transition-all select-none">
+                                <input type="checkbox" value="Dijitalleşme" class="needs-checkbox peer sr-only">
+                                <div class="w-4.5 h-4.5 rounded-lg border border-[#141e39]/20 flex items-center justify-center bg-white peer-checked:bg-[#287fc7] peer-checked:border-[#287fc7] transition shrink-0">
+                                    <svg class="w-3 h-3 text-white hidden peer-checked:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                                <span class="font-bold text-xs text-[#141e39]/60 peer-checked:text-[#141e39] transition-all">Dijitalleşme</span>
+                            </label>
+
+                            <label class="relative flex items-center gap-2.5 p-3 rounded-xl border border-[#141e39]/10 bg-white hover:bg-slate-50 cursor-pointer transition-all select-none">
+                                <input type="checkbox" value="Makine-Teçhizat" class="needs-checkbox peer sr-only">
+                                <div class="w-4.5 h-4.5 rounded-lg border border-[#141e39]/20 flex items-center justify-center bg-white peer-checked:bg-[#287fc7] peer-checked:border-[#287fc7] transition shrink-0">
+                                    <svg class="w-3 h-3 text-white hidden peer-checked:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                                <span class="font-bold text-xs text-[#141e39]/60 peer-checked:text-[#141e39] transition-all">Makine-Teçhizat</span>
+                            </label>
+
+                            <label class="relative flex items-center gap-2.5 p-3 rounded-xl border border-[#141e39]/10 bg-white hover:bg-slate-50 cursor-pointer transition-all select-none">
+                                <input type="checkbox" value="Finansman/Kredi" class="needs-checkbox peer sr-only">
+                                <div class="w-4.5 h-4.5 rounded-lg border border-[#141e39]/20 flex items-center justify-center bg-white peer-checked:bg-[#287fc7] peer-checked:border-[#287fc7] transition shrink-0">
+                                    <svg class="w-3 h-3 text-white hidden peer-checked:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                                <span class="font-bold text-xs text-[#141e39]/60 peer-checked:text-[#141e39] transition-all">Finansman/Kredi</span>
+                            </label>
+
+                            <label class="relative flex items-center gap-2.5 p-3 rounded-xl border border-[#141e39]/10 bg-white hover:bg-slate-50 cursor-pointer transition-all select-none">
+                                <input type="checkbox" value="Enerji Verimliliği" class="needs-checkbox peer sr-only">
+                                <div class="w-4.5 h-4.5 rounded-lg border border-[#141e39]/20 flex items-center justify-center bg-white peer-checked:bg-[#287fc7] peer-checked:border-[#287fc7] transition shrink-0">
+                                    <svg class="w-3 h-3 text-white hidden peer-checked:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                                <span class="font-bold text-xs text-[#141e39]/60 peer-checked:text-[#141e39] transition-all">Enerji Verimliliği</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-[#141e39]/60 mb-1">Şirket Açıklaması</label>
+                        <div class="relative mt-1">
+                            <textarea id="description" class="w-full rounded-xl border border-[#141e39]/15 bg-white p-3.5 text-sm text-[#141e39] focus:ring-2 focus:ring-[#27a9bb]/40 focus:outline-none focus:border-[#27a9bb] transition-all" rows="3">Yazılım geliştirme ve Ar-Ge çalışmaları yürüten startup.</textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="triggerDirectMatch()" class="mt-8 w-full bg-gradient-to-r from-[#287fc7] to-[#27a9bb] hover:opacity-90 text-white font-bold py-4 px-4 rounded-xl transition text-sm flex items-center justify-center gap-2 shadow-lg shadow-[#287fc7]/20">
+                <i data-lucide="sparkles" class="w-4 h-4 text-white animate-pulse"></i>
+                Bana Uygun Destekleri Bul ve Analiz Et
+            </button>
+        </div>
+    </div>
+</main>
+
+<!-- ============ SAYFA 2.5: EŞLEŞME SONUÇLARI SAYFASI ============ -->
+<main id="results-page" class="app-page hidden min-h-[calc(100vh-4rem)] flex-col bg-slate-50/40">
+    <div class="px-6 md:px-12 py-4 border-b border-[#141e39]/10 bg-white flex justify-between items-center shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-r from-[#287fc7] to-[#27a9bb] flex items-center justify-center shadow-sm">
+                <i data-lucide="award" class="w-5 h-5 text-white"></i>
+            </div>
+            <div>
+                <h1 class="text-base font-bold text-[#141e39]">Uygun Teşvik ve Destek Sonuçları</h1>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-[#27a9bb]"></span>
+                    <span class="text-[10px] text-[#141e39]/60 font-semibold">Profilinizin analiz edilmesiyle eşleşen tüm aktif destekler</span>
+                </div>
+            </div>
+        </div>
+        <button onclick="showPage('form-page')" class="flex items-center gap-1.5 bg-[#141e39]/5 hover:bg-[#141e39]/10 text-xs font-semibold px-3.5 py-2 rounded-xl transition border border-[#141e39]/10 text-[#141e39]/70">
+            <i data-lucide="arrow-left" class="w-4 h-4"></i>
+            Profili Düzenle
+        </button>
+    </div>
+
+    <!-- Sonuç Kartları Konteyneri -->
+    <div class="flex-1 py-10 px-6 overflow-y-auto">
+        <div id="results-container" class="w-full max-w-4xl mx-auto">
+            <div class="bg-white rounded-2xl shadow-xl border border-[#141e39]/5 p-12 text-center">
+                <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="clipboard-list" class="w-8 h-8 text-[#141e39]/30"></i>
+                </div>
+                <h3 class="text-lg font-bold text-[#141e39]">Henüz Profil Analizi Yapılmadı</h3>
+                <p class="text-xs text-[#141e39]/50 max-w-sm mx-auto mt-2 mb-6">
+                    Lütfen önce Profil Formu sayfasından bilgilerinizi doldurun ve "Bana Uygun Destekleri Bul ve Analiz Et" butonuna tıklayarak eşleşmeleri taratın.
+                </p>
+                <button onclick="showPage('form-page')" class="inline-flex items-center gap-2 bg-gradient-to-r from-[#287fc7] to-[#27a9bb] hover:opacity-90 text-white font-bold text-xs px-6 py-3 rounded-xl transition shadow-md shadow-[#287fc7]/10">
+                    Form Sayfasına Git
+                    <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- ============ SAYFA 3: SOHBET SAYFASI ============ -->
+<main id="chat-page" class="app-page hidden h-[calc(100vh-4rem)] flex-col bg-white overflow-hidden">
+    <div class="px-6 md:px-12 py-4 border-b border-[#141e39]/10 bg-white flex justify-between items-center shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-r from-[#287fc7] to-[#27a9bb] flex items-center justify-center shadow-sm">
+                <i data-lucide="bot" class="w-5 h-5 text-white"></i>
+            </div>
+            <div>
+                <h1 class="text-base font-bold text-[#141e39]">Yapay Zeka Destekli Teşvik Asistanı</h1>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span class="text-[10px] text-[#141e39]/60 font-semibold">Bağlantı Aktif & Hazır</span>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="resetSession()" class="flex items-center gap-1.5 bg-[#141e39]/5 hover:bg-[#141e39]/10 text-xs font-semibold px-3.5 py-2 rounded-xl transition border border-[#141e39]/10 text-[#141e39]/70">
+                <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                Yeni Sohbet
+            </button>
+            <button onclick="showPage('results-page')" id="back-to-results-btn" class="hidden flex items-center gap-1.5 bg-[#141e39]/5 hover:bg-[#141e39]/10 text-xs font-semibold px-3.5 py-2 rounded-xl transition border border-[#141e39]/10 text-[#141e39]/70">
+                <i data-lucide="award" class="w-4 h-4"></i>
+                Sonuçlara Dön
+            </button>
+        </div>
+    </div>
+
+    <!-- Dinamik Destek Seçim Banner'ı -->
+    <div id="focus-banner" class="hidden bg-amber-50 border-b border-amber-200 px-6 md:px-12 py-2 text-xs text-amber-800 flex justify-between items-center transition-all shrink-0">
+        <div class="flex items-center gap-2">
+            <i data-lucide="target" class="w-4 h-4 text-amber-600 animate-pulse"></i>
+            <span>Şu an <strong id="focus-program-name" class="font-bold underline"></strong> hakkında konuşuyorsunuz.</span>
+        </div>
+        <button onclick="clearProgramFocus()" class="text-amber-700 hover:text-amber-900 transition p-1 rounded hover:bg-amber-100 font-semibold flex items-center gap-1">
+            <span>Odaklanmayı Kaldır</span>
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+        </button>
+    </div>
+
+    <!-- Mesaj Kutusu -->
+    <div id="chat-box" class="hidden flex-1 p-6 md:px-16 overflow-y-auto space-y-5 min-h-0 max-w-5xl w-full mx-auto">
+        <div class="flex gap-3 max-w-3xl items-start">
+            <div class="bg-[#287fc7]/15 text-[#1f6aa8] p-4 rounded-2xl border border-[#287fc7]/30 text-sm leading-relaxed border-l-4 border-l-[#287fc7]">
+                <i data-lucide="info" class="w-4 h-4 inline mr-1 text-[#1f6aa8]"></i>
+                Hoş geldiniz! Merak ettiğiniz teşvik şartlarını, limitlerini ve kurallarını asistanımıza sorarak hızlı cevaplar alabilirsiniz.
+            </div>
+        </div>
+    </div>
+
+    <!-- Bağımsız / Yeni Karşılama Ekranı ve Kılavuz Kartları -->
+    <div id="greeting-screen" class="flex-1 flex flex-col items-center justify-center px-6 max-w-4xl mx-auto w-full min-h-0 py-8">
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-r from-[#287fc7] to-[#27a9bb] flex items-center justify-center shadow-lg shadow-[#287fc7]/20 mb-6">
+            <i data-lucide="bot" class="w-8 h-8 text-white animate-pulse"></i>
+        </div>
+        <h2 class="text-2xl md:text-3xl font-extrabold mb-3 text-[#141e39]">Merhaba <span class="username-slot">kullanıcı</span>, ben Teşvik Asistanınız</h2>
+        <p class="text-sm md:text-base text-[#141e39]/55 max-w-lg leading-relaxed mb-8 text-center">
+            İşletmeniz için aklınızdaki tüm genel soruları sorabilir ya da hızlı yönlendirme kartlarından birini seçebilirsiniz.
+        </p>
+        
+        <!-- Önerilen Sorular Grid Kartları -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl">
+            <button onclick="fillAndSend('KOSGEB hangi harcamaları destekliyor?')" class="flex items-start gap-3 p-4 rounded-xl border border-[#141e39]/10 hover:border-[#287fc7]/50 hover:bg-[#287fc7]/5 text-left transition group">
+                <div class="p-2.5 rounded-lg bg-[#287fc7]/10 text-[#287fc7] group-hover:bg-[#287fc7] group-hover:text-white transition">
+                    <i data-lucide="sparkles" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <h4 class="font-bold text-xs text-[#141e39]">Destek Kapsamları</h4>
+                    <p class="text-[10px] text-[#141e39]/50 mt-0.5">Personel, makine, yazılım vb. kalemlerin destek oranlarını sorabilirsiniz.</p>
+                </div>
+            </button>
+            <button onclick="fillAndSend('TÜBİTAK 1507 programı için başvuru belgeleri neler?')" class="flex items-start gap-3 p-4 rounded-xl border border-[#141e39]/10 hover:border-[#27a9bb]/50 hover:bg-[#27a9bb]/5 text-left transition group">
+                <div class="p-2.5 rounded-lg bg-[#27a9bb]/10 text-[#27a9bb] group-hover:bg-[#27a9bb] group-hover:text-white transition">
+                    <i data-lucide="file-text" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <h4 class="font-bold text-xs text-[#141e39]">Gerekli Evraklar</h4>
+                    <p class="text-[10px] text-[#141e39]/50 mt-0.5">Başvuru süreçlerinde istenen temel evrak listeleri hakkında bilgi alabilirsiniz.</p>
+                </div>
+            </button>
+            <button onclick="fillAndSend('SGK istihdam teşviklerinden nasıl yararlanırım?')" class="flex items-start gap-3 p-4 rounded-xl border border-[#141e39]/10 hover:border-amber-500/50 hover:bg-amber-50 text-left transition group">
+                <div class="p-2.5 rounded-lg bg-amber-500/10 text-amber-600 group-hover:bg-amber-500 group-hover:text-white transition">
+                    <i data-lucide="check-circle" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <h4 class="font-bold text-xs text-[#141e39]">SGK İstihdam Teşvikleri</h4>
+                    <p class="text-[10px] text-[#141e39]/50 mt-0.5">Yeni personel istihdamlarında uygulanan prim indirimlerini öğrenin.</p>
+                </div>
+            </button>
+            <button onclick="fillAndSend('Teknopark vergi muafiyeti şartları nelerdir?')" class="flex items-start gap-3 p-4 rounded-xl border border-[#141e39]/10 hover:border-purple-500/50 hover:bg-purple-50 text-left transition group">
+                <div class="p-2.5 rounded-lg bg-purple-500/10 text-purple-600 group-hover:bg-purple-500 group-hover:text-white transition">
+                    <i data-lucide="landmark" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <h4 class="font-bold text-xs text-[#141e39]">Teknopark Avantajları</h4>
+                    <p class="text-[10px] text-[#141e39]/50 mt-0.5">Gelir vergisi ve KDV muafiyetlerinden yararlanma kurallarını inceleyin.</p>
+                </div>
+            </button>
+        </div>
+    </div>
+
+    <!-- Giriş Kutusu -->
+    <div class="p-4 md:px-16 bg-white border-t border-[#141e39]/10 shrink-0">
+        <div class="max-w-4xl mx-auto flex gap-2.5">
+            <input id="user-input" type="text" placeholder="Sorunuzu yazın (Örn: 'KOSGEB Ar-Ge desteği için başvuru şartları nelerdir?')...." class="flex-1 rounded-xl border border-[#141e39]/20 bg-[#141e39]/[0.02] p-3.5 text-sm text-[#141e39] focus:outline-none focus:ring-2 focus:ring-[#27a9bb]/40 focus:border-[#27a9bb] focus:bg-white transition" onkeydown="if(event.key === 'Enter') sendMessage()">
+            <button onclick="sendMessage()" class="bg-gradient-to-r from-[#287fc7] to-[#27a9bb] hover:opacity-90 text-white font-bold px-6 py-3.5 rounded-xl transition text-sm flex items-center gap-2 shadow-md shadow-[#287fc7]/15">
+                <span class="hidden sm:inline">Gönder</span>
+                <i data-lucide="send" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </div>
+</main>
+
+<!-- ============ GİRİŞ / KAYIT MODAL PENCERESİ ============ -->
+<div id="auth-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-[#141e39]/40 backdrop-blur-sm transition-opacity" onclick="closeAuthModal()"></div>
+
+    <div class="relative bg-white w-full max-w-md rounded-2xl shadow-2xl border border-[#141e39]/5 p-8 overflow-hidden transform scale-95 opacity-0 transition-all duration-300" id="auth-modal-card">
+        <div class="absolute -top-16 -right-16 w-32 h-32 rounded-full bg-[#27a9bb]/10 blur-2xl pointer-events-none"></div>
+        <div class="absolute -bottom-16 -left-16 w-32 h-32 rounded-full bg-[#287fc7]/10 blur-2xl pointer-events-none"></div>
+
+        <button onclick="closeAuthModal()" class="absolute top-4 right-4 p-1.5 rounded-lg text-[#141e39]/40 hover:text-[#141e39]/70 hover:bg-[#141e39]/5 transition">
+            <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+
+        <div class="flex border-b border-[#141e39]/10 mb-6">
+            <button id="tab-login" onclick="switchAuthTab('login')" class="flex-1 pb-3 text-sm font-bold border-b-2 border-[#287fc7] text-[#287fc7] transition">Giriş Yap</button>
+            <button id="tab-register" onclick="switchAuthTab('register')" class="flex-1 pb-3 text-sm font-semibold border-b-2 border-transparent text-[#141e39]/50 hover:text-[#141e39]/80 transition">Kayıt Ol</button>
+        </div>
+
+        <!-- Giriş Formu -->
+        <div id="form-login-container" class="space-y-4">
+            <div class="text-center mb-4">
+                <h2 class="text-xl font-bold text-[#141e39]">Tekrar Hoş Geldiniz</h2>
+                <p class="text-xs text-[#141e39]/50">Hesabınıza giriş yaparak sayfalar arası erişim sağlayın.</p>
+            </div>
+            <div>
+                <label class="block font-semibold text-[#141e39]/60 mb-1 text-xs">Kullanıcı Adı</label>
+                <input id="login-username" type="text" autocomplete="username" placeholder="Kullanıcı adınız" class="w-full rounded-xl border border-[#141e39]/15 bg-white p-3.5 text-sm text-[#141e39] focus:ring-2 focus:ring-[#27a9bb]/40 focus:outline-none focus:border-[#27a9bb] transition" onkeydown="if(event.key === 'Enter') attemptLogin()">
+            </div>
+            <div>
+                <label class="block font-semibold text-[#141e39]/60 mb-1 text-xs">Şifre</label>
+                <input id="login-password" type="password" autocomplete="current-password" placeholder="••••••••" class="w-full rounded-xl border border-[#141e39]/15 bg-white p-3.5 text-sm text-[#141e39] focus:ring-2 focus:ring-[#27a9bb]/40 focus:outline-none focus:border-[#27a9bb] transition" onkeydown="if(event.key === 'Enter') attemptLogin()">
+            </div>
+            <p id="login-error" class="hidden text-xs text-red-600 flex items-center gap-1">
+                <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
+                Kullanıcı adı veya şifre hatalı (Örn: team3 / 12345).
+            </p>
+            <button onclick="attemptLogin()" class="w-full bg-gradient-to-r from-[#287fc7] to-[#27a9bb] hover:opacity-90 text-white font-bold py-3.5 px-4 rounded-xl transition text-sm flex items-center justify-center gap-2 shadow-lg shadow-[#287fc7]/20 mt-2">
+                Giriş Yap
+                <i data-lucide="log-in" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <!-- Kayıt Formu -->
+        <div id="form-register-container" class="space-y-4 hidden">
+            <div class="text-center mb-4">
+                <h2 class="text-xl font-bold text-[#141e39]">Yeni Hesap Oluştur</h2>
+                <p class="text-xs text-[#141e39]/50">Hemen kaydolun ve tüm özelliklere sınırsız erişin.</p>
+            </div>
+            <div>
+                <label class="block font-semibold text-[#141e39]/60 mb-1 text-xs">Adınız Soyadınız / İşletme Adı</label>
+                <input id="register-name" type="text" placeholder="Örn. Ahmet Yılmaz" class="w-full rounded-xl border border-[#141e39]/15 bg-white p-3.5 text-sm text-[#141e39] focus:ring-2 focus:ring-[#27a9bb]/40 focus:outline-none focus:border-[#27a9bb] transition">
+            </div>
+            <div>
+                <label class="block font-semibold text-[#141e39]/60 mb-1 text-xs">Kullanıcı Adı</label>
+                <input id="register-username" type="text" placeholder="kullaniciadi" class="w-full rounded-xl border border-[#141e39]/15 bg-white p-3.5 text-sm text-[#141e39] focus:ring-2 focus:ring-[#27a9bb]/40 focus:outline-none focus:border-[#27a9bb] transition">
+            </div>
+            <div>
+                <label class="block font-semibold text-[#141e39]/60 mb-1 text-xs">Şifre</label>
+                <input id="register-password" type="password" placeholder="••••••••" class="w-full rounded-xl border border-[#141e39]/15 bg-white p-3.5 text-sm text-[#141e39] focus:ring-2 focus:ring-[#27a9bb]/40 focus:outline-none focus:border-[#27a9bb] transition">
+            </div>
+            <p id="register-error" class="hidden text-xs text-red-600 flex items-center gap-1">
+                <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
+                Lütfen tüm alanları doldurun.
+            </p>
+            <button onclick="attemptRegister()" class="w-full bg-gradient-to-r from-[#287fc7] to-[#27a9bb] hover:opacity-90 text-white font-bold py-3.5 px-4 rounded-xl transition text-sm flex items-center justify-center gap-2 shadow-lg shadow-[#287fc7]/20 mt-2">
+                Kayıt Ol ve Giriş Yap
+                <i data-lucide="user-plus" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ MODAL UYARI BİLDİRİMİ (TOAST) ============ -->
+<div id="warning-toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 pointer-events-none transition-all duration-300 flex items-center gap-3 bg-[#141e39] text-white px-5 py-4 rounded-xl shadow-xl border border-white/10 max-w-sm">
+    <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0">
+        <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+    </div>
+    <div>
+        <h4 class="text-sm font-bold">Erişim Engellendi</h4>
+        <p class="text-xs text-white/70 mt-0.5">Form veya sohbet sayfalarını açmak için lütfen önce giriş yapınız.</p>
+    </div>
+    <button onclick="hideToast()" class="ml-auto p-1 text-white/40 hover:text-white transition rounded-md hover:bg-white/5">
+        <i data-lucide="x" class="w-4 h-4"></i>
+    </button>
+</div>
+
+<!-- Geliştirici Konsolu: Kayar Panel -->
+<button onclick="toggleConsole()" class="fixed bottom-5 left-5 z-40 bg-[#141e39] hover:bg-[#1c2a52] text-white p-3 rounded-full shadow-lg flex items-center gap-2">
+    <i data-lucide="terminal" class="w-4 h-4 text-[#6fd0db]"></i>
+</button>
+<div id="dev-console" class="fixed top-0 right-0 h-full w-full sm:w-96 bg-[#141e39] text-white z-50 shadow-2xl translate-x-full transition-transform duration-300 flex flex-col p-5">
+    <div class="flex items-center justify-between mb-4 shrink-0">
+        <div class="flex items-center gap-2">
+            <i data-lucide="terminal" class="w-5 h-5 text-[#6fd0db]"></i>
+            <h2 class="text-base font-bold text-white">Geliştirici Konsolu</h2>
+        </div>
+        <button onclick="toggleConsole()" class="text-white/50 hover:text-white p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="flex-1 flex flex-col space-y-4 min-h-0 text-[10px] font-mono">
+        <div class="flex-1 flex flex-col min-h-0">
+            <span class="text-white/50 font-bold mb-1">Giden Son İstek (ChatRequest)</span>
+            <div class="flex-1 bg-black/30 border border-white/10 p-3 rounded-lg overflow-auto text-[#6fd0db]">
+                <pre id="json-request">Henüz bir veri gönderilmedi.</pre>
+            </div>
+        </div>
+        <div class="flex-1 flex flex-col min-h-0">
+            <span class="text-white/50 font-bold mb-1">Gelen Son Yanıt (ChatResponse)</span>
+            <div class="flex-1 bg-black/30 border border-white/10 p-3 rounded-lg overflow-auto text-[#ffd166]">
+                <pre id="json-response">Henüz bir veri alındmadı.</pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    if (window.lucide) { lucide.createIcons(); }
+
+    const chatBox = document.getElementById('chat-box');
+
+    let currentMatches = [];
+    let currentRecommendations = [];
+    let recommendationStore = {};
+
+    let selectedProgramId = null;
+    let selectedProgramName = null;
+
+    // --- Kimlik Doğrulama ve Durum Yönetimi ---
+    const usersDb = {
+        'team3': '12345'
+    };
+    let isLoggedIn = false;
+    let currentUsername = null;
+
+    function attemptLogin() {
+        const usernameField = document.getElementById('login-username');
+        const passwordField = document.getElementById('login-password');
+        const errorEl = document.getElementById('login-error');
+
+        const username = usernameField.value.trim();
+        const password = passwordField.value;
+
+        if (usersDb[username] && usersDb[username] === password) {
+            errorEl.classList.add('hidden');
+            loginSuccess(username);
+        } else {
+            errorEl.classList.remove('hidden');
+            passwordField.value = '';
+        }
+    }
+
+    function attemptRegister() {
+        const nameField = document.getElementById('register-name');
+        const usernameField = document.getElementById('register-username');
+        const passwordField = document.getElementById('register-password');
+        const errorEl = document.getElementById('register-error');
+
+        const name = nameField.value.trim();
+        const username = usernameField.value.trim();
+        const password = passwordField.value;
+
+        if (name && username && password) {
+            usersDb[username] = password;
+            errorEl.classList.add('hidden');
+            loginSuccess(username);
+        } else {
+            errorEl.classList.remove('hidden');
+        }
+    }
+
+    function loginSuccess(username) {
+        isLoggedIn = true;
+        currentUsername = username;
+
+        // Arayüz (Navbar) Güncellemesi
+        document.getElementById('nav-auth-buttons').classList.add('hidden');
+        document.getElementById('nav-user-profile').classList.remove('hidden');
+        document.getElementById('nav-pages-menu').classList.remove('hidden');
+        document.getElementById('nav-pages-menu').classList.add('flex');
+
+        document.getElementById('user-display-name').textContent = username;
+        document.getElementById('user-avatar').textContent = username.charAt(0).toUpperCase();
+
+        const welcomeBadge = document.getElementById('welcome-badge-text');
+        if (welcomeBadge) {
+            welcomeBadge.innerHTML = `Hoş geldin, <span class="font-bold text-[#27a9bb]">${username}</span>`;
+        }
+
+        updateGreetings();
+        closeAuthModal();
+        hideToast();
+
+        if (window.lucide) { lucide.createIcons(); }
+    }
+
+    function logout() {
+        isLoggedIn = false;
+        currentUsername = null;
+
+        // Arayüzü Sıfırla ve Ana Sayfaya Dön
+        document.getElementById('nav-auth-buttons').classList.remove('hidden');
+        document.getElementById('nav-user-profile').classList.add('hidden');
+        document.getElementById('nav-pages-menu').classList.add('hidden');
+        document.getElementById('nav-pages-menu').classList.remove('flex');
+
+        const welcomeBadge = document.getElementById('welcome-badge-text');
+        if (welcomeBadge) {
+            welcomeBadge.textContent = "Keşfetmeye Hazır Mısınız?";
+        }
+
+        showPage('hero-page');
+
+        // Form alanlarını temizle
+        document.getElementById('login-username').value = '';
+        document.getElementById('login-password').value = '';
+        document.getElementById('register-name').value = '';
+        document.getElementById('register-username').value = '';
+        document.getElementById('register-password').value = '';
+
+        if (window.lucide) { lucide.createIcons(); }
+    }
+
+    function updateGreetings() {
+        document.querySelectorAll('.username-slot').forEach(el => {
+            el.textContent = currentUsername || 'kullanıcı';
+        });
+    }
+
+    // --- Modal ve Toast (Uyarı) Yönetimi ---
+    function openAuthModal(activeTab = 'login') {
+        const modal = document.getElementById('auth-modal');
+        const card = document.getElementById('auth-modal-card');
+        
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+            card.classList.remove('scale-95', 'opacity-0');
+            card.classList.add('scale-100', 'opacity-100');
+        }, 10);
+
+        switchAuthTab(activeTab);
+    }
+
+    function closeAuthModal() {
+        const modal = document.getElementById('auth-modal');
+        const card = document.getElementById('auth-modal-card');
+        
+        card.classList.remove('scale-100', 'opacity-100');
+        card.classList.add('scale-95', 'opacity-0');
+        
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            document.getElementById('login-error').classList.add('hidden');
+            document.getElementById('register-error').classList.add('hidden');
+        }, 200);
+    }
+
+    function switchAuthTab(tab) {
+        const tabLogin = document.getElementById('tab-login');
+        const tabRegister = document.getElementById('tab-register');
+        const formLogin = document.getElementById('form-login-container');
+        const formRegister = document.getElementById('form-register-container');
+
+        if (tab === 'login') {
+            tabLogin.className = "flex-1 pb-3 text-sm font-bold border-b-2 border-[#287fc7] text-[#287fc7] transition";
+            tabRegister.className = "flex-1 pb-3 text-sm font-semibold border-b-2 border-transparent text-[#141e39]/50 hover:text-[#141e39]/80 transition";
+            formLogin.classList.remove('hidden');
+            formRegister.classList.add('hidden');
+        } else {
+            tabRegister.className = "flex-1 pb-3 text-sm font-bold border-b-2 border-[#287fc7] text-[#287fc7] transition";
+            tabLogin.className = "flex-1 pb-3 text-sm font-semibold border-b-2 border-transparent text-[#141e39]/50 hover:text-[#141e39]/80 transition";
+            formRegister.classList.remove('hidden');
+            formLogin.classList.add('hidden');
+        }
+        if (window.lucide) { lucide.createIcons(); }
+    }
+
+    let toastTimeout;
+    function showToast() {
+        const toast = document.getElementById('warning-toast');
+        toast.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+        toast.classList.add('translate-y-0', 'opacity-100');
+
+        clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(() => {
+            hideToast();
+        }, 5000);
+    }
+
+    function hideToast() {
+        const toast = document.getElementById('warning-toast');
+        if (toast) {
+            toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+            toast.classList.remove('translate-y-0', 'opacity-100');
+        }
+    }
+
+    // --- SAYFA GEÇİŞ YÖNETİMİ (SPA Router) ---
+    function showPage(pageId) {
+        if (pageId !== 'hero-page' && !isLoggedIn) {
+            showToast();
+            openAuthModal('login');
+            return;
+        }
+
+        // Tüm sayfaları gizle
+        document.querySelectorAll('.app-page').forEach(page => {
+            page.classList.add('hidden');
+            page.classList.remove('flex');
+        });
+
+        // İstenen sayfayı aç
+        const target = document.getElementById(pageId);
+        if (target) {
+            target.classList.remove('hidden');
+            target.classList.add('flex');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Navbar'daki aktif butonun rengini güncelle
+        const buttons = ['hero-page', 'form-page', 'results-page', 'chat-page'];
+        buttons.forEach(id => {
+            const btn = document.getElementById('nav-btn-' + id);
+            if (btn) {
+                if (id === pageId) {
+                    btn.className = "px-3 py-1.5 rounded-lg transition bg-white text-[#287fc7] shadow-sm font-bold";
+                } else {
+                    btn.className = "px-3 py-1.5 rounded-lg transition text-[#141e39]/70 hover:text-[#141e39]";
+                }
+            }
+        });
+
+        if (window.lucide) { lucide.createIcons(); }
+    }
+
+    function toggleConsole() {
+        document.getElementById('dev-console').classList.toggle('drawer-open');
+    }
+
+    function fillAndSend(text) {
+        revealChat();
+        document.getElementById('user-input').value = text;
+        sendMessage();
+    }
+
+    function revealChat() {
+        const greeting = document.getElementById('greeting-screen');
+        const box = document.getElementById('chat-box');
+        if (greeting && !greeting.classList.contains('hidden')) {
+            greeting.classList.add('hidden');
+            box.classList.remove('hidden');
+        }
+    }
+
+    // --- ARKA UÇ EŞLEŞTİRME VE SONUÇ SAYFASI YÖNETİMİ ---
+    async function triggerDirectMatch() {
+        showPage('results-page');
+        
+        const resultsContainer = document.getElementById('results-container');
+        resultsContainer.innerHTML = `
+            <div class="bg-white rounded-2xl shadow-xl border border-[#141e39]/5 p-16 text-center flex flex-col items-center justify-center">
+                <div class="w-16 h-16 rounded-full border-4 border-[#287fc7] border-t-transparent animate-spin mb-6"></div>
+                <h3 class="text-lg font-bold text-[#141e39]">Şirket Profiliniz Analiz Ediliyor</h3>
+                <p class="text-xs text-[#141e39]/50 max-w-sm mx-auto mt-2">
+                    Girdiğiniz bilgiler inceleniyor ve en güncel devlet teşvik programlarıyla uyumluluk puanınız hesaplanıyor...
+                </p>
+            </div>
+        `;
+        if (window.lucide) { lucide.createIcons(); }
+
+        const userProfile = {
+            sector: document.getElementById('sector').value,
+            employee_count: parseInt(document.getElementById('employee_count').value) || 0,
+            annual_revenue: parseFloat(document.getElementById('annual_revenue').value) || 0,
+            needs: Array.from(document.querySelectorAll('.needs-checkbox:checked')).map(cb => cb.value),
+            city: document.getElementById('city').value,
+            company_type: document.getElementById('company_type').value,
+            description: document.getElementById('description').value
+        };
+
+        const payload = {
+            message: "Bana uygun teşvikleri bul",
+            user_profile: userProfile,
+            current_matches: [],
+            current_recommendations: [],
+            conversation_id: "conv-web-test",
+            language: "tr"
+        };
+
+        document.getElementById('json-request').textContent = JSON.stringify(payload, null, 2);
+
+        try {
+            const response = await fetch('http://localhost:8000/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+            document.getElementById('json-response').textContent = JSON.stringify(data, null, 2);
+
+            if (data.success) {
+                if (data.matches && data.matches.length > 0) {
+                    currentMatches = data.matches;
+                }
+                if (data.recommendations && data.recommendations.length > 0) {
+                    currentRecommendations = data.recommendations;
+                }
+                
+                renderResultsPage(currentRecommendations);
+            } else {
+                resultsContainer.innerHTML = `
+                    <div class="bg-white rounded-2xl shadow-xl border border-red-100 p-12 text-center">
+                        <div class="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4 text-red-600">
+                            <i data-lucide="alert-triangle" class="w-8 h-8"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-red-700">Analiz Sırasında Hata Oluştu</h3>
+                        <p class="text-xs text-red-600/70 max-w-sm mx-auto mt-2 mb-6">
+                            ${data.error?.message || "Servisten geçersiz veri döndü."}
+                        </p>
+                        <button onclick="showPage('form-page')" class="inline-flex items-center gap-2 bg-[#141e39]/5 hover:bg-[#141e39]/10 text-xs font-bold px-6 py-3 rounded-xl transition">
+                            Forma Geri Dön
+                        </button>
+                    </div>
+                `;
+                if (window.lucide) { lucide.createIcons(); }
+            }
+        } catch (err) {
+            resultsContainer.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-xl border border-red-100 p-12 text-center">
+                    <div class="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4 text-red-600">
+                        <i data-lucide="wifi-off" class="w-8 h-8"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-red-700">Orchestration Service Bağlantı Hatası</h3>
+                    <p class="text-xs text-red-600/70 max-w-sm mx-auto mt-2 mb-6">
+                        Lütfen yerel sunucunuzun (8000 portu) aktif ve çalışır durumda olduğundan emin olun.
+                    </p>
+                    <button onclick="showPage('form-page')" class="inline-flex items-center gap-2 bg-[#141e39]/5 hover:bg-[#141e39]/10 text-xs font-bold px-6 py-3 rounded-xl transition">
+                        Forma Geri Dön
+                    </button>
+                </div>
+            `;
+            if (window.lucide) { lucide.createIcons(); }
+        }
+    }
+
+    function renderResultsPage(recommendations) {
+        const container = document.getElementById('results-container');
+        if (!recommendations || recommendations.length === 0) {
+            container.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-xl border border-[#141e39]/5 p-12 text-center">
+                    <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                        <i data-lucide="info" class="w-8 h-8 text-[#141e39]/30"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-[#141e39]">Eşleşen Destek Bulunamadı</h3>
+                    <p class="text-xs text-[#141e39]/50 max-w-sm mx-auto mt-2 mb-6">
+                        Girdiğiniz kriterlere uyan aktif bir teşvik programı bulunamadı. Lütfen formdaki bilgileri değiştirerek tekrar deneyin.
+                    </p>
+                    <button onclick="showPage('form-page')" class="inline-flex items-center gap-2 bg-[#141e39]/5 hover:bg-[#141e39]/10 text-xs font-bold px-6 py-3 rounded-xl transition">
+                        Formu Düzenle
+                    </button>
+                </div>
+            `;
+            if (window.lucide) { lucide.createIcons(); }
+            return;
+        }
+
+        let html = `<div class="space-y-8">`;
+
+        recommendations.forEach((rec, idx) => {
+            const recId = `result-rec-${idx}`;
+            recommendationStore[recId] = rec;
+            const safeProgramName = rec.program_name.replace(/'/g, "\\'");
+
+            html += `
+                <div class="bg-white rounded-2xl border border-[#141e39]/10 shadow-sm overflow-hidden">
+                    <div class="p-6 md:p-8 space-y-6">
+                        <div class="flex flex-col sm:flex-row justify-between items-start gap-4">
+                            <div>
+                                <span class="bg-[#287fc7]/10 text-[#1f6aa8] border border-[#287fc7]/20 text-[10px] px-2.5 py-1 rounded-md font-bold uppercase tracking-wider block w-max mb-2">
+                                    ${rec.institution}
+                                </span>
+                                <h3 class="text-xl font-extrabold text-[#141e39] leading-tight">${rec.program_name}</h3>
+                            </div>
+                            <div class="bg-amber-50 text-amber-700 border border-amber-200 px-4 py-2 rounded-xl text-xs font-extrabold shrink-0 flex items-center gap-1.5 self-start sm:self-auto">
+                                <i data-lucide="award" class="w-4.5 h-4.5"></i>
+                                <span>%${Math.round(rec.score)} Uyum</span>
+                            </div>
+                        </div>
+
+                        <p class="text-sm text-[#141e39]/70 leading-relaxed italic border-l-4 border-l-[#287fc7] pl-4">
+                            ${rec.summary}
+                        </p>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                            <div>
+                                <strong class="text-xs font-bold text-[#1f6aa8] uppercase tracking-wider block mb-2">Neden Eşleşti?</strong>
+                                <ul class="space-y-1.5 text-xs text-[#141e39]/65">
+                                    ${rec.why_matched.map(item => `
+                                        <li class="flex items-start gap-2">
+                                            <i data-lucide="check" class="w-4 h-4 text-emerald-500 shrink-0 mt-0.5"></i>
+                                            <span>${item.replace(/^\s*[-*•\d\.]+\s*/, '')}</span>
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            </div>
+                            <div>
+                                <strong class="text-xs font-bold text-amber-600 uppercase tracking-wider block mb-2">Kritik Uygunluk Şartları</strong>
+                                <ul class="space-y-1.5 text-xs text-[#141e39]/65">
+                                    ${rec.eligibility_notes.map(item => `
+                                        <li class="flex items-start gap-2">
+                                            <i data-lucide="info" class="w-4 h-4 text-amber-500 shrink-0 mt-0.5"></i>
+                                            <span>${item.replace(/^\s*[-*•\d\.]+\s*/, '')}</span>
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="pt-2">
+                            <strong class="text-xs font-bold text-[#27a9bb] uppercase tracking-wider block mb-3">Başvuru Adımları</strong>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-[#141e39]/65">
+                                ${rec.application_steps.map((step, sIdx) => `
+                                    <div class="flex items-start gap-3 bg-slate-50 p-3 rounded-xl border border-[#141e39]/5">
+                                        <span class="flex items-center justify-center w-5 h-5 rounded-full bg-[#27a9bb]/10 text-[#27a9bb] font-bold text-[10px] shrink-0 mt-0.5">${sIdx + 1}</span>
+                                        <span>${step.replace(/^\s*\d+[\s\.\)-]+\s*/, '')}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <div class="pt-2">
+                            <strong class="text-xs font-bold text-purple-600 uppercase tracking-wider block mb-2">İstenen Belgeler</strong>
+                            <ul class="space-y-1.5 text-xs text-[#141e39]/65">
+                                ${rec.required_documents.map(item => `
+                                    <li class="flex items-start gap-2">
+                                        <i data-lucide="file-text" class="w-4 h-4 text-purple-400 shrink-0 mt-0.5"></i>
+                                        <span>${item.replace(/^\s*[-*•\d\.]+\s*/, '')}</span>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+
+                        <div class="pt-6 border-t border-[#141e39]/10 flex flex-wrap gap-4 items-center justify-between">
+                            <div class="flex flex-wrap gap-2.5">
+                                <button onclick="downloadPDF('${recId}')" class="inline-flex items-center gap-1.5 bg-[#27a9bb]/10 hover:bg-[#27a9bb]/15 text-xs text-[#27a9bb] hover:text-[#1c8a98] font-bold px-4 py-2.5 rounded-xl transition">
+                                    <i data-lucide="file-down" class="w-4 h-4"></i>
+                                    PDF Raporu İndir
+                                </button>
+                                ${rec.application_url ? `
+                                    <a href="${rec.application_url}" target="_blank" class="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-xs text-[#141e39]/70 font-bold px-4 py-2.5 rounded-xl transition">
+                                        <i data-lucide="external-link" class="w-4 h-4"></i>
+                                        Resmi Başvuru
+                                    </a>
+                                ` : ''}
+                            </div>
+                            <button onclick="focusOnProgramAndChat('${rec.program_id}', '${safeProgramName}')" class="inline-flex items-center gap-2 bg-gradient-to-r from-[#287fc7] to-[#27a9bb] hover:opacity-90 text-white font-bold text-xs px-5 py-3 rounded-xl transition shadow-md shadow-[#287fc7]/10">
+                                <i data-lucide="message-square" class="w-4 h-4"></i>
+                                Bu Teşvike Özel Soru Sormaya Başla
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += `</div>`;
+        container.innerHTML = html;
+        if (window.lucide) { lucide.createIcons(); }
+    }
+
+    // --- TEŞVİKE ODAKLANMA VE CHAT YÖNLENDİRME ---
+    function focusOnProgramAndChat(programId, programName) {
+        selectedProgramId = programId;
+        selectedProgramName = programName;
+
+        document.getElementById('focus-program-name').textContent = programName;
+        document.getElementById('focus-banner').classList.remove('hidden');
+        document.getElementById('back-to-results-btn').classList.remove('hidden');
+
+        showPage('chat-page');
+        revealChat();
+
+        appendSystemMessage(`🎯 Odaklanılan Destek: <strong>${programName}</strong>. Soracağınız sorular doğrudan bu programın şartları, belgeleri ve uygunluğuna göre cevaplanacaktır.`, 'info');
+    }
+
+    function clearProgramFocus() {
+        selectedProgramId = null;
+        selectedProgramName = null;
+
+        document.getElementById('focus-banner').classList.add('hidden');
+        document.getElementById('back-to-results-btn').classList.add('hidden');
+        appendSystemMessage("🎯 Odaklanma kaldırıldı. Serbest genel sorular sormaya devam edebilirsiniz.", 'info');
+        if (window.lucide) { lucide.createIcons(); }
+    }
+
+    function appendSystemMessage(text, type = 'info') {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = "flex gap-3 max-w-2xl items-start";
+        let bgClass = type === 'error' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-[#287fc7]/15 text-[#1f6aa8] border-[#287fc7]/30';
+        let iconName = type === 'error' ? 'alert-triangle' : 'info';
+
+        msgDiv.innerHTML = `
+            <div class="${bgClass} p-3.5 rounded-2xl border text-xs">
+                <i data-lucide="${iconName}" class="w-4 h-4 inline mr-1"></i>
+                ${text}
+            </div>
+        `;
+        chatBox.appendChild(msgDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        if (window.lucide) { lucide.createIcons(); }
+    }
+
+    function resetSession() {
+        currentMatches = [];
+        currentRecommendations = [];
+        recommendationStore = {};
+        selectedProgramId = null;
+        selectedProgramName = null;
+
+        document.getElementById('focus-banner').classList.add('hidden');
+        document.getElementById('back-to-results-btn').classList.add('hidden');
+        document.getElementById('chat-box').classList.add('hidden');
+        document.getElementById('greeting-screen').classList.remove('hidden');
+        chatBox.innerHTML = `
+            <div class="flex gap-3 max-w-2xl items-start">
+                <div class="bg-[#287fc7]/15 text-[#1f6aa8] p-4 rounded-2xl border border-[#287fc7]/30 text-xs leading-relaxed border-l-4 border-l-[#287fc7]">
+                    <i data-lucide="info" class="w-4 h-4 inline mr-1 text-[#1f6aa8]"></i>
+                    Oturum başarıyla sıfırlandı. Konuşma ve model bağlamları temizlendi.
+                </div>
+            </div>
+        `;
+        document.getElementById('json-request').textContent = "Oturum sıfırlandı.";
+        document.getElementById('json-response').textContent = "Oturum sıfırlandı.";
+        if (window.lucide) { lucide.createIcons(); }
+    }
+
+    // --- CHAT MESAJ GÖNDERİMİ VE METİN AKIŞI (STREAMING) ---
+    async function sendMessage() {
+        const inputField = document.getElementById('user-input');
+        const message = inputField.value.trim();
+        if (!message) return;
+
+        revealChat();
+        appendMessage(message, 'user');
+        inputField.value = '';
+
+        const userProfile = {
+            sector: document.getElementById('sector').value,
+            employee_count: parseInt(document.getElementById('employee_count').value) || 0,
+            annual_revenue: parseFloat(document.getElementById('annual_revenue').value) || 0,
+            needs: Array.from(document.querySelectorAll('.needs-checkbox:checked')).map(cb => cb.value),
+            city: document.getElementById('city').value,
+            company_type: document.getElementById('company_type').value,
+            description: document.getElementById('description').value
+        };
+
+        let payloadMatches = [];
+        if (selectedProgramId) {
+            const foundMatch = currentMatches.find(m => m.program_id === selectedProgramId);
+            if (foundMatch) {
+                payloadMatches = [foundMatch];
+            } else {
+                payloadMatches = [{
+                    program_id: selectedProgramId,
+                    program_name: selectedProgramName,
+                    institution: "",
+                    score: 100,
+                    match_reasons: [],
+                    missing_criteria: []
+                }];
+            }
+        } else {
+            payloadMatches = currentMatches;
+        }
+
+        const payload = {
+            message: message,
+            user_profile: userProfile,
+            current_matches: payloadMatches,
+            current_recommendations: currentRecommendations,
+            conversation_id: "conv-web-test",
+            language: "tr"
+        };
+
+        document.getElementById('json-request').textContent = JSON.stringify(payload, null, 2);
+
+        const loaderId = appendMessage("Yapay Zekaya danışılıyor...", 'assistant-loading');
+
+        try {
+            const response = await fetch('http://localhost:8000/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+            document.getElementById(loaderId).remove();
+
+            document.getElementById('json-response').textContent = JSON.stringify(data, null, 2);
+
+            if (data.success) {
+                // Sadece cevap ve kaynakları ekleyelim (Tavsiye/kart listesi tamamen kaldırıldı)
+                appendMessage(data.answer, 'assistant', data.sources, data.intent);
+
+                if (data.matches && data.matches.length > 0) {
+                    currentMatches = data.matches;
+                }
+                if (data.recommendations && data.recommendations.length > 0) {
+                    currentRecommendations = data.recommendations;
+                }
+            } else {
+                appendMessage("Sistem Hatası: " + (data.error?.message || "Beklenmeyen hata"), 'assistant-error');
+            }
+        } catch (err) {
+            document.getElementById(loaderId).remove();
+            appendMessage("Orchestration Service'e bağlanılamadı. Lütfen kapsayıcıyı (8000 portu) kontrol edin.", 'assistant-error');
+        }
+    }
+
+    function parseMarkdown(text) {
+        if (!text) return "";
+        let formatted = text.replace(/\n/g, '<br>');
+        formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-[#141e39]">$1</strong>');
+        formatted = formatted.replace(/^\s*[-*]\s+(.*?)$/gm, '<li class="ml-4 list-disc">$1</li>');
+        return formatted;
+    }
+
+    // Mesaj Ekleme ve Akış Kontrolü
+    function appendMessage(text, sender, sources = [], intent = null) {
+        const msgDiv = document.createElement('div');
+        const uniqueId = 'msg-' + Math.random().toString(36).substr(2, 9);
+        msgDiv.id = uniqueId;
+        msgDiv.className = "flex gap-3 max-w-3xl text-sm lg:text-base " + (sender === 'user' ? "justify-end ml-auto" : "items-start");
+
+        let textClass = "";
+        let icon = "";
+
+        if (sender === 'user') {
+            textClass = "bg-[#287fc7] text-white p-4 rounded-2xl rounded-tr-none shadow-md max-w-lg leading-relaxed";
+            icon = `<div class="bg-[#287fc7] text-white p-2 rounded-full shrink-0"><i data-lucide="user" class="w-5 h-5"></i></div>`;
+            msgDiv.innerHTML = `<div class="${textClass}">${parseMarkdown(text)}</div>${icon}`;
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            if (window.lucide) { lucide.createIcons(); }
+            return uniqueId;
+        } 
+        
+        if (sender === 'assistant-error') {
+            textClass = "bg-red-50 text-red-700 p-4 rounded-2xl border border-red-200 shadow-md w-full leading-relaxed";
+            icon = `<div class="bg-red-600 text-white p-2 rounded-full shrink-0"><i data-lucide="alert-circle" class="w-5 h-5"></i></div>`;
+            msgDiv.innerHTML = `${icon}<div class="${textClass}">${parseMarkdown(text)}</div>`;
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            if (window.lucide) { lucide.createIcons(); }
+            return uniqueId;
+        } 
+        
+        if (sender === 'assistant-loading') {
+            textClass = "bg-[#141e39]/5 text-[#141e39]/60 p-4 rounded-2xl border border-[#141e39]/15 shadow-sm flex items-center gap-2 text-sm";
+            msgDiv.innerHTML = `<div class="${textClass}"><span class="w-2 h-2 rounded-full bg-[#287fc7] animate-ping"></span><span>${text}</span></div>`;
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            return uniqueId;
+        }
+
+        // --- ASİSTAN NORMAL YANITI (STREAMING / AKIŞ EFEKTİ) ---
+        textClass = "bg-[#141e39]/[0.02] text-[#141e39]/80 p-6 rounded-2xl border border-[#141e39]/10 shadow-sm w-full leading-relaxed border-l-4 border-l-[#287fc7]";
+        icon = `<div class="bg-[#141e39]/5 text-[#141e39]/60 p-2 rounded-full shrink-0 border border-[#141e39]/15"><i data-lucide="bot" class="w-5 h-5 text-[#287fc7]"></i></div>`;
+
+        let innerHTML = `${icon}<div class="${textClass} space-y-3">`;
+
+        if (intent) {
+            innerHTML += `
+                <div class="flex flex-wrap items-center gap-2 pb-2.5 border-b border-[#141e39]/10">
+                    <span class="text-[9px] bg-[#287fc7]/20 text-[#1f6aa8] px-2.5 py-1 rounded-full border border-[#287fc7]/30 font-bold uppercase tracking-wider">Niyet: ${intent.intent}</span>
+                    <span class="text-[9px] bg-[#141e39]/5 text-[#141e39]/60 px-2.5 py-1 rounded-full border border-[#141e39]/10 font-semibold">Güven Skoru: %${Math.round(intent.confidence * 100)}</span>
+                    <span class="text-[9px] ${intent.is_in_scope ? 'bg-[#27a9bb]/20 text-[#1c8a98] border-[#27a9bb]/40' : 'bg-red-50 text-red-700 border-red-200'} px-2.5 py-1 rounded-full border font-semibold">${intent.is_in_scope ? 'Kapsam İçi' : 'Kapsam Dışı'}</span>
+                </div>
+            `;
+        }
+
+        const textContainerId = `${uniqueId}-stream-text`;
+        const additionsContainerId = `${uniqueId}-additions`;
+        
+        innerHTML += `
+            <div id="${textContainerId}" class="leading-relaxed whitespace-pre-line text-[#141e39]/80 text-sm md:text-base"></div>
+            <div id="${additionsContainerId}" class="hidden fade-in-delayed"></div>
+        </div>`;
+        
+        msgDiv.innerHTML = innerHTML;
+        chatBox.appendChild(msgDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        if (window.lucide) { lucide.createIcons(); }
+
+        const textContainer = document.getElementById(textContainerId);
+        const additionsContainer = document.getElementById(additionsContainerId);
+
+        const tokens = text.split(/(\s+)/);
+        let tokenIdx = 0;
+        let accumulatedText = "";
+
+        const streamInterval = setInterval(() => {
+            if (tokenIdx < tokens.length) {
+                accumulatedText += tokens[tokenIdx];
+                textContainer.innerHTML = parseMarkdown(accumulatedText);
+                chatBox.scrollTop = chatBox.scrollHeight;
+                tokenIdx++;
+            } else {
+                clearInterval(streamInterval);
+                // Metin akışı tamamen bittikten sonra sadece Atıfları/Kaynakları ekleyelim (Eşleşen teşvik listeleri tamamen kalktı)
+                renderStreamAdditions(additionsContainer, sources);
+            }
+        }, 15);
+
+        return uniqueId;
+    }
+
+    // Yenilenen profesyonel atıf ve resmi kaynak listesi çizimi
+    function renderStreamAdditions(container, sources) {
+        let additionHtml = "";
+
+        if (sources && sources.length > 0) {
+            additionHtml += `
+                <div class="mt-4 pt-3 border-t border-[#141e39]/10 text-xs text-[#141e39]/60">
+                    <strong class="flex items-center gap-1.5 text-[#141e39] mb-2 font-bold">
+                        <i data-lucide="library" class="w-4 h-4 text-[#287fc7]"></i> Yararlanılan Resmi Kaynaklar ve Mevzuat Atıfları:
+                    </strong>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1.5">
+            `;
+            sources.forEach((src) => {
+                const fileLabel = src.source_file || 'Resmi Döküman / Teşvik Kılavuzu';
+                const scorePct = Math.round(src.score * 100);
+                additionHtml += `
+                    <div class="bg-[#141e39]/5 border border-[#141e39]/10 text-[#141e39]/70 px-3 py-2 rounded-xl flex items-center gap-2.5 shadow-sm">
+                        <i data-lucide="file-text" class="w-4 h-4 text-[#287fc7]/60 shrink-0"></i>
+                        <div class="truncate">
+                            <p class="font-bold text-[11px] truncate text-[#141e39]">${fileLabel}</p>
+                            <p class="text-[9px] text-[#141e39]/50">Atıf Gücü: %${scorePct}</p>
+                        </div>
+                    </div>
+                `;
+            });
+            additionHtml += `</div></div>`;
+        }
+
+        container.innerHTML = additionHtml;
+        container.classList.remove('hidden');
+        chatBox.scrollTop = chatBox.scrollHeight;
+        if (window.lucide) { lucide.createIcons(); }
+    }
+</script>
+</body>
+</html>

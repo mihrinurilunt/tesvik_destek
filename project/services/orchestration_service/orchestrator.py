@@ -17,6 +17,21 @@ from services.orchestration_service.service_clients import (
 )
 
 
+def deduplicate_sources(sources_list: list) -> list:
+    """
+    Aynı kaynak dosyalarının (source_file) arayüzde mükerrer şekilde listelenmesini 
+    engellemek için kaynak listesini temizler ve benzersiz olanları tutar.
+    """
+    seen = set()
+    unique_sources = []
+    for src in sources_list:
+        name = src.source_file
+        if name not in seen:
+            seen.add(name)
+            unique_sources.append(src)
+    return unique_sources
+
+
 async def handle_recommendation(
     request: RecommendationRequest,
 ) -> RecommendationResponse:
@@ -40,6 +55,7 @@ async def handle_recommendation(
             conversation_id=request.conversation_id,
         )
 
+    # Detaylı bir analiz için top_k_chunks parametresini 5 olarak koruyoruz
     rag_response = await call_rag_generate(
         RAGGenerateRequest(
             user_profile=request.user_profile,
@@ -50,6 +66,9 @@ async def handle_recommendation(
         )
     )
 
+    # Kaynakları benzersiz hale getiriyoruz
+    clean_sources = deduplicate_sources(rag_response.sources)
+
     return RecommendationResponse(
         success=True,
         message="Öneriler başarıyla oluşturuldu.",
@@ -58,7 +77,7 @@ async def handle_recommendation(
         user_profile=request.user_profile,
         matches=match_response.matches,
         recommendations=rag_response.recommendations,
-        sources=rag_response.sources,
+        sources=clean_sources,
         conversation_id=request.conversation_id,
     )
 
@@ -85,7 +104,7 @@ async def handle_chat(request: ChatRequest) -> ChatResponse:
             conversation_id=request.conversation_id,
         )
 
-    # 2. GENERAL INFO (Yeni Eklendi)
+    # 2. GENERAL INFO
     if intent.intent == IntentType.GENERAL_INFO:
         return ChatResponse(
             success=True,
@@ -105,7 +124,7 @@ async def handle_chat(request: ChatRequest) -> ChatResponse:
             conversation_id=request.conversation_id,
         )
 
-    # 3. OUT OF SCOPE (Yeni Eklendi)
+    # 3. OUT OF SCOPE
     if intent.intent == IntentType.OUT_OF_SCOPE:
         return ChatResponse(
             success=True,
@@ -135,6 +154,8 @@ async def handle_chat(request: ChatRequest) -> ChatResponse:
             )
         )
 
+        clean_sources = deduplicate_sources(rag_response.sources)
+
         return ChatResponse(
             success=True,
             message="RAG cevabı üretildi.",
@@ -144,13 +165,12 @@ async def handle_chat(request: ChatRequest) -> ChatResponse:
             user_profile=request.user_profile,
             matches=request.current_matches,
             recommendations=request.current_recommendations,
-            sources=rag_response.sources,
+            sources=clean_sources,
             conversation_id=request.conversation_id,
         )
 
-    # 5. ELIGIBILITY QUESTION (Yeni Eklendi)
+    # 5. ELIGIBILITY QUESTION
     if intent.intent == IntentType.ELIGIBILITY_QUESTION:
-        # Eğer zaten konuşulmuş/eşleşmiş destekler varsa doğrudan onlar üzerinde RAG çalıştır
         if request.current_matches:
             rag_response = await call_rag_answer(
                 RAGAnswerRequest(
@@ -161,6 +181,7 @@ async def handle_chat(request: ChatRequest) -> ChatResponse:
                     top_k_chunks=5,
                 )
             )
+            clean_sources = deduplicate_sources(rag_response.sources)
             return ChatResponse(
                 success=True,
                 message="Uygunluk analizi üretildi.",
@@ -170,11 +191,10 @@ async def handle_chat(request: ChatRequest) -> ChatResponse:
                 user_profile=request.user_profile,
                 matches=request.current_matches,
                 recommendations=request.current_recommendations,
-                sources=rag_response.sources,
+                sources=clean_sources,
                 conversation_id=request.conversation_id,
             )
         else:
-            # Eşleşen destek yoksa ve profil eksikse bilgi iste
             if intent.needs_user_profile or request.user_profile is None:
                 return ChatResponse(
                     success=True,
@@ -193,7 +213,6 @@ async def handle_chat(request: ChatRequest) -> ChatResponse:
                     conversation_id=request.conversation_id,
                 )
             
-            # Profil tamsa önce eşleştir, sonra uygunluk sorusunu RAG ile cevapla
             match_response = await call_matching_service(
                 MatchRequest(
                     user_profile=request.user_profile,
@@ -211,6 +230,8 @@ async def handle_chat(request: ChatRequest) -> ChatResponse:
                 )
             )
             
+            clean_sources = deduplicate_sources(rag_response.sources)
+            
             return ChatResponse(
                 success=True,
                 message="Yeni uygunluk analizi üretildi.",
@@ -220,7 +241,7 @@ async def handle_chat(request: ChatRequest) -> ChatResponse:
                 user_profile=request.user_profile,
                 matches=match_response.matches,
                 recommendations=request.current_recommendations,
-                sources=rag_response.sources,
+                sources=clean_sources,
                 conversation_id=request.conversation_id,
             )
 
@@ -252,6 +273,8 @@ async def handle_chat(request: ChatRequest) -> ChatResponse:
             )
         )
 
+        clean_sources = deduplicate_sources(recommendation_response.sources)
+
         return ChatResponse(
             success=True,
             message="Chat üzerinden öneriler oluşturuldu.",
@@ -261,11 +284,11 @@ async def handle_chat(request: ChatRequest) -> ChatResponse:
             user_profile=request.user_profile,
             matches=recommendation_response.matches,
             recommendations=recommendation_response.recommendations,
-            sources=recommendation_response.sources,
+            sources=clean_sources,
             conversation_id=request.conversation_id,
         )
 
-    # 7. PROFILE UPDATE (Yeni Eklendi)
+    # 7. PROFILE UPDATE
     if intent.intent == IntentType.PROFILE_UPDATE:
         return ChatResponse(
             success=True,

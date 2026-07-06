@@ -1,14 +1,5 @@
 """
-TÜBİTAK scraper
-Index : https://tubitak.gov.tr/tr/destekler   (tüm program linkleri tek sayfada)
-Detail: https://tubitak.gov.tr/tr/destekler/{kategori}/{alt}/{program-slug}
-
-Page structure (Drupal 10):
-  - Main content: div.paragraph--type--duz-metin .field--name-field-icerik
-    - Sections separated by <strong> tags inside <p> elements
-  - File sections: div.paragraph--type--dosya-listesi-media
-    - Section name: .field--name-field-baslik
-    - Files: a[href]
+TÜBİTAK Deep Scraper
 """
 
 from bs4 import BeautifulSoup
@@ -18,7 +9,6 @@ from utils.models import make_record, make_section
 BASE = "https://tubitak.gov.tr"
 INDEX = f"{BASE}/tr/destekler"
 
-# URL segments that indicate a program detail page (not a category listing)
 _PROGRAM_PREFIXES = [
     "/tr/destekler/",
     "/tr/burslar/",
@@ -33,7 +23,6 @@ def get_program_urls(session) -> list[str]:
     for a in soup.select("a[href]"):
         href = a["href"].strip()
 
-        # Normalise relative → absolute
         if href.startswith("/"):
             href = BASE + href
 
@@ -42,14 +31,11 @@ def get_program_urls(session) -> list[str]:
 
         path = href.replace(BASE, "")
 
-        # Must be under /tr/destekler/ or /tr/burslar/
         if not any(path.startswith(p) for p in _PROGRAM_PREFIXES):
             continue
 
-        # Must have at least 4 path segments:
-        # /tr / destekler / kategori / program-slug
         segments = [s for s in path.split("/") if s]
-        if len(segments) < 4:
+        if len(segments) < 3:  # Daha derin olmayan kategorileri de yakalayabilmek için limiti 3'e çektik
             continue
 
         urls.add(href)
@@ -57,60 +43,71 @@ def get_program_urls(session) -> list[str]:
     return sorted(urls)
 
 
+def _parse_table(table_el) -> str:
+    rows_text = []
+    for row in table_el.find_all("tr"):
+        cols = [col.get_text(" ", strip=True) for col in row.find_all(["td", "th"])]
+        if any(cols):
+            rows_text.append(" | ".join(cols))
+    return "\n".join(rows_text)
+
+
 def _parse_text_sections(soup) -> list[dict]:
-    """
-    Parse the main duz-metin block.
-    TÜBİTAK puts all content in one block, using <strong> tags as headers:
-      <p><strong>Amaç</strong></p>
-      <p>Bu programın amacı...</p>
-    """
     sections = []
-    block = soup.select_one(
-        "div.paragraph--type--duz-metin .field--name-field-icerik"
+    
+    # Sadece field--name-field-icerik değil, Drupal body alanlarını da kapsama alıyoruz
+    block = (
+        soup.select_one("div.paragraph--type--duz-metin .field--name-field-icerik")
+        or soup.select_one(".field--name-body")
+        or soup.select_one("div.node__content")
     )
     if not block:
         return sections
 
-    current_title = "Genel"
+    current_title = "Genel Bilgiler"
     current_lines = []
 
-    for p in block.find_all("p"):
-        strong = p.find("strong")
-        if strong and strong.get_text(strip=True):
-            # Save previous section
-            if current_lines:
-                sections.append(
-                    make_section(current_title, " ".join(current_lines).strip())
-                )
-            current_title = strong.get_text(strip=True).rstrip(":")
-            # Text on the same line after the <strong>
-            rest = p.get_text(" ", strip=True)
-            # Remove the header text itself
-            rest = rest.replace(strong.get_text(strip=True), "").strip().lstrip(":")
-            current_lines = [rest] if rest else []
-        else:
-            text = p.get_text(" ", strip=True)
-            if text:
-                current_lines.append(text)
+    # p, table, ul, ol elemanlarını sırayla işliyoruz
+    for el in block.find_all(["p", "table", "ul", "ol"]):
+        if el.name == "p":
+            strong = el.find("strong")
+            # Eğer paragraf <strong> ile başlıyorsa yeni bir bölüme (section) geçiyoruz
+            if strong and strong.get_text(strip=True) and len(strong.get_text(strip=True)) < 50:
+                if current_lines:
+                    sections.append(
+                        make_section(current_title, "\n".join(current_lines).strip())
+                    )
+                current_title = strong.get_text(strip=True).rstrip(":")
+                rest = el.get_text(" ", strip=True).replace(strong.get_text(strip=True), "").strip().lstrip(":")
+                current_lines = [rest] if rest else []
+            else:
+                text = el.get_text(" ", strip=True)
+                if text:
+                    current_lines.append(text)
+        elif el.name == "table":
+            table_text = _parse_table(el)
+            if table_text:
+                current_lines.append("\n[Tablo Verisi]\n" + table_text + "\n")
+        elif el.name in ["ul", "ol"]:
+            for li in el.find_all("li"):
+                li_text = li.get_text(" ", strip=True)
+                if li_text:
+                    current_lines.append(f"- {li_text}")
 
-    # Last section
     if current_lines:
         sections.append(
-            make_section(current_title, " ".join(current_lines).strip())
+            make_section(current_title, "\n".join(current_lines).strip())
         )
 
     return sections
 
 
 def _parse_file_sections(soup) -> list[dict]:
-    """
-    Parse dosya-listesi blocks (Esaslar, Kılavuzlar, Formlar, etc.)
-    Each block becomes its own section with links.
-    """
     sections = []
-    for block in soup.select("div.paragraph--type--dosya-listesi-media"):
-        baslik_el = block.select_one(".field--name-field-baslik")
-        title = baslik_el.get_text(strip=True) if baslik_el else "Dosyalar"
+    # Dosya indirme listeleri (Uygulama Esasları vb.)
+    for block in soup.select("div.paragraph--type--dosya-listesi-media, .field--name-field-dosyalar"):
+        baslik_el = block.select_one(".field--name-field-baslik") or block.select_one("h3")
+        title = baslik_el.get_text(strip=True) if baslik_el else "İlgili Belgeler ve Başvuru Formları"
 
         links = []
         for a in block.select("a[href]"):
@@ -122,7 +119,7 @@ def _parse_file_sections(soup) -> list[dict]:
                 links.append({"text": text, "href": href})
 
         if links:
-            sections.append(make_section(title, "", links))
+            sections.append(make_section(title, "Bu bölümde programla ilgili resmi dökümanlar yer almaktadır.", links))
 
     return sections
 
@@ -131,9 +128,8 @@ def parse_program(session, url: str) -> dict:
     r = get(session, url)
     soup = BeautifulSoup(r.text, "html.parser")
 
-    # Program name
-    h1 = soup.select_one("h1 span")
-    program_name = h1.get_text(strip=True) if h1 else ""
+    h1 = soup.select_one("h1 span") or soup.select_one("h1")
+    program_name = h1.get_text(strip=True) if h1 else url.split("/")[-1].replace("-", " ").title()
 
     sections = _parse_text_sections(soup) + _parse_file_sections(soup)
 

@@ -1,6 +1,7 @@
 import os
 import json
-from typing import List
+import asyncio  # Asenkron paralel yönetim için
+from typing import List, Optional
 from openai import AsyncOpenAI
 from pydantic import HttpUrl
 
@@ -30,13 +31,15 @@ async def generate_recommendation_for_match(
     """
     Qdrant'tan aldığı bağlam dökümanları ile LLM'i çağırarak kişiselleştirilmiş hibe önerisi oluşturur.
     """
+    # retrieval.py içindeki güncellenmiş retrieve_chunks'ı çağırıyoruz (Akıllı dosya adı üretimi içerir)
     chunks = await retrieve_chunks(
         query_text=match.program_name,
         top_k=top_k_chunks,
         program_id=match.program_id
     )
     
-    context_text = "\n\n".join([f"--- Chunk {i+1} ---\n{c.text}" for i, c in enumerate(chunks)])
+    # LLM'e giden chunk başlıklarında artık program_name yerine arayüze de yansıyan dinamik c.source_file değerini kullanıyoruz
+    context_text = "\n\n".join([f"--- Kaynak {i+1} (Belge: {c.source_file or 'Teşvik Kılavuzu'}) ---\n{c.text}" for i, c in enumerate(chunks)])
     prompt = build_recommendation_prompt(profile, match, context_text)
     
     try:
@@ -70,7 +73,7 @@ async def generate_recommendation_for_match(
             required_documents=data.get("required_documents") or ["Gerekli kurumsal belgeler."],
             application_url=match.application_url,
             source_urls=source_urls,
-            sources=chunks,
+            sources=chunks,  # Bu sayede chunk'lar (ve içindeki doğru source_file alanları) taşınır
             disclaimer="Bu öneriler bilgilendirme amaçlıdır; resmi uygunluk veya başvuru garantisi vermez."
         )
     except Exception as e:
@@ -89,19 +92,15 @@ async def generate_recommendation_for_match(
             sources=chunks
         )
 
-# services/rag_service/llm_client.py dosyasındaki call_llm_generate fonksiyonu:
-
-import asyncio  # Asenkron paralel yönetim için içe aktarıyoruz
 
 async def call_llm_generate(request: RAGGenerateRequest) -> RAGResponse:
     """
     Eşleşen tüm programları paralel (asyncio.gather) olarak işleyerek
-    sistem gecikmesini (latency) 30 saniyelerden 4-5 saniyeye düşürür ve
-    zaman aşımı riskini tamamen ortadan kaldırır.
+    sistem gecikmesini (latency) minimuma indirir.
     """
     logger.info(f"Paralel RAG üretimi başlatılıyor. Program sayısı: {len(request.matches)}")
     
-    # Performans ve token sınırları için en uyumlu ilk 5 eşleşmeyi paralel görevler olarak hazırlıyoruz
+    # İlk 5 eşleşmeyi paralel görevler olarak hazırlıyoruz
     tasks = [
         generate_recommendation_for_match(
             profile=request.user_profile,
@@ -111,14 +110,14 @@ async def call_llm_generate(request: RAGGenerateRequest) -> RAGResponse:
         for match in request.matches[:5]
     ]
     
-    # Tüm OpenAI/RAG isteklerini aynı anda (paralel) tetikliyoruz
+    # Tüm OpenAI/RAG isteklerini asenkron paralel olarak tetikliyoruz
     recommendations = await asyncio.gather(*tasks)
     
     all_sources = []
     for rec in recommendations:
         all_sources.extend(rec.sources)
         
-    # Yinelenen kaynakların temizlenmesi
+    # Yinelenen kaynakların temizlenmesi (chunk_id bazlı)
     seen_chunks = set()
     deduped_sources = []
     for src in all_sources:
@@ -152,32 +151,26 @@ async def call_llm_generate(request: RAGGenerateRequest) -> RAGResponse:
     )
 
 
-# services/rag_service/llm_client.py içindeki call_llm_answer fonksiyonunun güncel hali:
-
 async def call_llm_answer(request: RAGAnswerRequest) -> RAGResponse:
     """
     Kullanıcı sorusuna bağlamsal veya genel yanıt üretir.
-    Sorgu zenginleştirme (Query Enrichment) mekanizması ile metadata uyuşmazlıklarında dahi
-    doğru programa odaklanılmasını garanti eder.
     """
     program_id = None
     focused_program_name = None
-    query_text = request.user_message  # Orijinal kullanıcı mesajı
+    query_text = request.user_message
     
-    # Odaklanılmış bir program var mı kontrol et
+    # Odaklanılmış tek bir program var mı kontrol et
     if request.current_matches and len(request.current_matches) == 1:
         program_id = request.current_matches[0].program_id
         focused_program_name = request.current_matches[0].program_name
         logger.info(f"RAG odaklanılan program: '{focused_program_name}' (ID: {program_id})")
         
         # SORGU ZENGİNLEŞTİRME (Query Enrichment)
-        # Kullanıcının "bu desteğe..." gibi zamirler barındıran sorusunu program adıyla birleştiriyoruz.
-        # Bu sayede vektör araması doğrudan ilgili programın döküman parçalarına yönlenir.
         query_text = f"{focused_program_name} - {request.user_message}"
 
     # Retrieval aşamasına filtrelenmiş veya zenginleştirilmiş sorguyu paslıyoruz
     chunks = await retrieve_chunks(
-        query_text=query_text, # Zenginleştirilmiş sorgu metni gönderiliyor
+        query_text=query_text,
         top_k=request.top_k_chunks,
         program_id=program_id
     )
@@ -185,14 +178,13 @@ async def call_llm_answer(request: RAGAnswerRequest) -> RAGResponse:
     context_text = ""
     if chunks:
         context_text = "\n\n".join(
-            [f"--- Kaynak {i+1} (Belge: {c.program_name or 'Belirtilmemiş'}) ---\n{c.text}" for i, c in enumerate(chunks)]
+            [f"--- Kaynak {i+1} (Belge: {c.source_file or 'Belirtilmemiş'}) ---\n{c.text}" for i, c in enumerate(chunks)]
         )
     else:
         context_text = "Veritabanında doğrudan eşleşen herhangi bir resmi döküman kaydı bulunamadı."
         
-    # Prompt builder fonksiyonuna odaklanılan program ismini paslıyoruz
     prompt = build_answer_prompt(
-        user_message=request.user_message, # LLM'e sadece orijinal soruyu gösteriyoruz
+        user_message=request.user_message,
         context_text=context_text, 
         profile=request.user_profile,
         focused_program_name=focused_program_name

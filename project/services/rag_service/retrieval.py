@@ -35,8 +35,6 @@ async def get_embedding(text: str) -> List[float]:
         raise e
 
 
-# services/rag_service/retrieval.py içindeki retrieve_chunks fonksiyonu:
-
 async def retrieve_chunks(
     query_text: str,
     top_k: int = 5,
@@ -106,14 +104,32 @@ async def retrieve_chunks(
                 except Exception:
                     pass
             
+            # --- AKILLI DOSYA ADI EŞLEŞTİRME (DİNAMİK KAYNAK ADI) ---
+            program_name = payload.get("program_name")
+            institution = payload.get("institution")
+            payload_source_file = payload.get("source_file")
+            
+            # Eğer payload'da doğrudan source_file yoksa, program_name ve institution'dan üretiyoruz
+            if payload_source_file:
+                computed_source_file = payload_source_file
+            elif institution and program_name:
+                computed_source_file = f"{institution} - {program_name}"
+            elif program_name:
+                computed_source_file = program_name
+            elif institution:
+                computed_source_file = f"{institution} Resmi Destek Kılavuzu"
+            else:
+                computed_source_file = "Resmi Teşvik Kılavuzu"
+            # -------------------------------------------------------
+
             sources.append(
                 SourceChunk(
                     chunk_id=str(hit.id),
                     program_id=payload.get("program_id"),
-                    program_name=payload.get("program_name"),
+                    program_name=program_name,
                     text=raw_text,
                     score=hit.score,
-                    source_file=payload.get("source_file"),
+                    source_file=computed_source_file,  # Dinamik kaynak adını yerleştiriyoruz
                     source_url=validated_source_url,
                     metadata=payload
                 )
