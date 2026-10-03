@@ -1,5 +1,5 @@
 fastapi
-qdrant-client
+qdrant-client>=1.10.0
 python-dotenv
 llama-index-core
 llama-index-vector-stores-qdrant
@@ -8,3 +8,4 @@ uvicorn
 requests
 beautifulsoup4
 pydantic
+pydantic-settings>=2.0.0

@@ -6,6 +6,7 @@ from openai import AsyncOpenAI
 from pydantic import HttpUrl
 
 from shared.config import settings
+from shared.exceptions import LLMException
 from shared.models import UserProfile, MatchResult, Recommendation
 from shared.schemas import RAGGenerateRequest, RAGAnswerRequest, RAGResponse
 from shared.logger import get_logger
@@ -44,7 +45,7 @@ async def generate_recommendation_for_match(
     
     try:
         response = await openai_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=settings.LLM_MODEL,
             messages=[
                 {"role": "system", "content": "Yalnızca şemaya uygun, geçerli saf JSON formatında yanıt veren bir yardımcı modülsün."},
                 {"role": "user", "content": prompt}
@@ -78,19 +79,7 @@ async def generate_recommendation_for_match(
         )
     except Exception as e:
         logger.error(f"Recommendation oluşturulurken LLM hatası ({match.program_id}): {e}")
-        return Recommendation(
-            program_id=match.program_id,
-            program_name=match.program_name,
-            institution=match.institution,
-            score=match.score,
-            summary=f"{match.program_name} programı şirketiniz için uygun bulunmuştur.",
-            why_matched=match.match_reasons or ["Genel profil uyumu sağlandı."],
-            eligibility_notes=match.missing_criteria or ["Şartları kontrol ediniz."],
-            application_steps=["Resmi kanallar üzerinden başvuru sürecini başlatın."],
-            required_documents=["Standart başvuru belgeleri."],
-            application_url=match.application_url,
-            sources=chunks
-        )
+        raise LLMException("Öneri üretilemedi; lütfen daha sonra tekrar deneyin.") from e
 
 
 async def call_llm_generate(request: RAGGenerateRequest) -> RAGResponse:
@@ -131,7 +120,7 @@ async def call_llm_generate(request: RAGGenerateRequest) -> RAGResponse:
         prompt = build_overall_answer_prompt(request.user_profile, recommendations)
         try:
             response = await openai_client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=settings.LLM_MODEL,
                 messages=[
                     {"role": "system", "content": "Sen cana yakın ve profesyonel bir teşvik danışmanısın."},
                     {"role": "user", "content": prompt}
@@ -141,7 +130,7 @@ async def call_llm_generate(request: RAGGenerateRequest) -> RAGResponse:
             overall_answer = response.choices[0].message.content or ""
         except Exception as e:
             logger.error(f"Genel cevap LLM üretim hatası: {e}")
-            overall_answer = "Şirketiniz için en uygun bulduğumuz devlet hibe ve destek programları aşağıda detaylandırılmıştır."
+            raise LLMException("Genel değerlendirme üretilemedi.") from e
             
     return RAGResponse(
         success=True,
@@ -192,7 +181,7 @@ async def call_llm_answer(request: RAGAnswerRequest) -> RAGResponse:
     
     try:
         response = await openai_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=settings.LLM_MODEL,
             messages=[
                 {"role": "system", "content": "Sen dürüst, resmi ve her zaman gerçekçi bir asistanısın."},
                 {"role": "user", "content": prompt}

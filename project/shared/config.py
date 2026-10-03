@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     # Qdrant ayarları
     QDRANT_URL: str = Field(default="http://qdrant:6333")
     QDRANT_COLLECTION_NAME: str = Field(default="tesvikler_v2")
+    QDRANT_VECTOR_NAME: str = Field(default="text-dense")
 
     # Embedding ayarları
     EMBEDDING_MODEL_NAME: str = Field(default="sentence-transformers/all-MiniLM-L6-v2")

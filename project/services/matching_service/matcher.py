@@ -33,7 +33,7 @@ EMPLOYEE_SCORE: float = 20.0
 REVENUE_SCORE: float = 20.0
 NEEDS_SCORE: float = 30.0   # ihtiyaç artık skoru etkiliyor
 
-PROGRAMS_COLLECTION = "tesvikler_v2"
+PROGRAMS_COLLECTION = settings.QDRANT_COLLECTION_NAME
 
 
 class Matcher:
@@ -285,17 +285,25 @@ class Matcher:
         import json
         try:
             qdrant = self._get_qdrant()
-            records, _ = await qdrant.scroll(
-                collection_name=PROGRAMS_COLLECTION,
-                limit=limit,
-                with_payload=True,
-                with_vectors=False,
-            )
+            records = []
+            offset = None
+            while True:
+                page, offset = await qdrant.scroll(
+                    collection_name=PROGRAMS_COLLECTION,
+                    limit=limit,
+                    offset=offset,
+                    with_payload=True,
+                    with_vectors=False,
+                )
+                records.extend(page)
+                if offset is None:
+                    break
 
+            seen_programs = set()
             programs: list[ProgramDocument] = []
             for record in records:
                 payload = record.payload
-                if not payload:
+                if not payload or payload.get("program_id") in seen_programs:
                     continue
 
                 try:
@@ -334,7 +342,9 @@ class Matcher:
                     filtered_payload = {k: v for k, v in payload.items() if k in valid_keys}
 
                     # 5. ProgramDocument modeline dönüştürelim
-                    programs.append(ProgramDocument(**filtered_payload))
+                    program = ProgramDocument(**filtered_payload)
+                    programs.append(program)
+                    seen_programs.add(program.program_id)
 
                 except Exception as parse_exc:
                     logger.warning(

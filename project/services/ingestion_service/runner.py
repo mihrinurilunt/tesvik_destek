@@ -14,10 +14,10 @@ SCRAPERS = {
 }
 
 BASE_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = BASE_DIR.parent
+PROJECT_ROOT = BASE_DIR
 
 OUTPUT_DIR = PROJECT_ROOT / "data"
-OUTPUT_FILE = OUTPUT_DIR / "programs.json"
+OUTPUT_FILE = OUTPUT_DIR / "output.json"
 
 def load_existing() -> list[dict]:
     if OUTPUT_FILE.exists():

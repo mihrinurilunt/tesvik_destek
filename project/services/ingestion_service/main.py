@@ -1,5 +1,8 @@
 import os
 import json
+from uuid import uuid4
+from qdrant_client import models
+from shared.config import settings
 from dotenv import load_dotenv
 import qdrant_client
 from llama_index.core import Document, VectorStoreIndex, StorageContext, Settings
@@ -11,8 +14,7 @@ from shared.models import ProgramDocument
 
 load_dotenv()
 
-# Embedding modeli ayarı (RAG ile ortak)
-Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-small")
+
 
 QDRANT_URL = os.environ.get("QDRANT_URL", "http://qdrant:6333")
 JSON_PATH = os.path.join(os.path.dirname(__file__), "data", "output.json")
@@ -22,11 +24,14 @@ def run_ingestion():
     
     if not os.path.exists(JSON_PATH):
         print(f"❌ HATA: {JSON_PATH} bulunamadı! Lütfen data/output.json dosyasını buraya koyun.")
-        return
+        raise FileNotFoundError(JSON_PATH)
         
     with open(JSON_PATH, "r", encoding="utf-8") as f:
         ham_veriler = json.load(f)
         
+    if not isinstance(ham_veriler, list) or not ham_veriler:
+        raise ValueError("Kaynak veri boş veya geçersiz; mevcut indeks korunuyor.")
+
     documents = []
     
     for d in ham_veriler:
@@ -94,15 +99,17 @@ def run_ingestion():
                 institution=institution,
                 description=amaci_text if len(amaci_text) >= 10 else f"{program_name} resmi analiz dökümanıdır.",
                 application_url=application_url,
+                source_url=application_url,
+                last_updated=d.get("scraped_at"),
                 sectors=sectors,
                 needs=needs,
                 conditions=sartlar_text.split("\n") if sartlar_text else [],
                 required_documents=ekler_text.split(",") if ekler_text else []
             )
         except Exception as ve:
-            # Eğer veri sözleşmeye uymuyorsa hata logu basar ve bu hibe programını veritabanına eklemeden geçer (atlar)
-            print(f"⚠️ UYARI: '{program_name}' verisi API Sözleşmesine uymadığı için atlandı! Hata: {ve}")
-            continue
+            # Kısmi veya geçersiz veriyle mevcut indeksi değiştirme.
+            print(f"⚠️ UYARI: '{program_name}' verisi API Sözleşmesine uymuyor; işlem durduruldu! Hata: {ve}")
+            raise ValueError(f"Geçersiz program: {program_id}; mevcut indeks korunuyor.") from ve
         # ---------------------------------------------
 
         # Vektör indeksleme için birleşik döküman metnini oluşturma
@@ -116,42 +123,72 @@ def run_ingestion():
         """
 
         # API Contract modelinden (validated_doc) doğrulanmış temiz üst bilgileri (metadata) alıyoruz
-        metadata = {
-            "program_id": validated_doc.program_id,
-            "program_name": validated_doc.program_name,
-            "institution": validated_doc.institution,
-            "application_url": str(validated_doc.application_url),
-            "sectors": validated_doc.sectors,
-            "needs": validated_doc.needs
-        }
-        
+        metadata = validated_doc.model_dump(mode="json", exclude_none=True)
+        # Başlık bazlı özetleme dışında kalan metin ve kaynak bağlantılarını da koru.
+        document_text += "\n" + "\n\n".join(
+            f"{sec.get('title', '')}\n{sec.get('content', '')}\n"
+            + "\n".join(link.get('href', '') for link in sec.get('links', []))
+            for sec in sections
+        )
+
         doc = Document(text=document_text, metadata=metadata, doc_id=validated_doc.program_id)
         documents.append(doc)
         
     print(f"📦 {len(documents)} adet döküman başarıyla doğrulandı ve hazırlandı. Qdrant'a yükleniyor...")
     
+    Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-small")
+    client = qdrant_client.QdrantClient(url=QDRANT_URL)
     try:
-        client = qdrant_client.QdrantClient(url=QDRANT_URL)
-        
-        if client.collection_exists(collection_name="tesvikler_v2"):
-            print("🗑️ Eski ve hatalı şemalı 'tesvikler_v2' tablosu otomatik siliniyor...")
-            client.delete_collection(collection_name="tesvikler_v2")
-        
-        vector_store = QdrantVectorStore(
-            client=client, 
-            collection_name="tesvikler_v2",
-            vector_name="text-dense"
+        publish_documents(client, documents, settings.QDRANT_COLLECTION_NAME)
+    finally:
+        client.close()
+
+
+def publish_documents(client, documents, target):
+    """Build in isolation, then atomically switch an alias. Never delete old data."""
+    if not documents:
+        raise ValueError("Boş indeks yayınlanamaz.")
+    aliases = {item.alias_name: item.collection_name for item in client.get_aliases().aliases}
+    if target not in aliases and client.collection_exists(target):
+        raise ValueError(
+            f"{target} fiziksel koleksiyon. Eski veriyi korumak için tüm servislerde "
+            "QDRANT_COLLECTION_NAME=tesvikler_live kullanın ve ingestion'ı yeniden çalıştırın."
         )
-        storage_context = StorageContext.from_defaults(vector_store=vector_store)
-        
-        VectorStoreIndex.from_documents(
-            documents, 
-            storage_context=storage_context
+    staging = f"{target}_build_{uuid4().hex}"
+    nodes = Settings.node_parser.get_nodes_from_documents(documents)
+    if not nodes:
+        raise ValueError("İndekslenecek metin bulunamadı.")
+    embeddings = Settings.embed_model.get_text_embedding_batch(
+        [node.get_content(metadata_mode="embed") for node in nodes]
+    )
+    for node, embedding in zip(nodes, embeddings, strict=True):
+        node.embedding = embedding
+    # Explicit schema: adapter defaults can otherwise create unnamed vectors.
+    client.create_collection(staging, vectors_config={
+        settings.QDRANT_VECTOR_NAME: models.VectorParams(
+            size=len(embeddings[0]), distance=models.Distance.COSINE
         )
-        print("✅ BAŞARILI: Tüm dökümanlar API Sözleşmesine uygun olarak Qdrant'a kaydedildi!")
-        
-    except Exception as e:
-        print(f"❌ HATA: Yükleme başarısız: {e}")
+    })
+    vector_store = QdrantVectorStore(
+        client=client,
+        collection_name=staging,
+        dense_vector_name=settings.QDRANT_VECTOR_NAME,
+    )
+    storage_context = StorageContext.from_defaults(vector_store=vector_store)
+    # Any indexing exception leaves the currently published alias untouched.
+    VectorStoreIndex(nodes, storage_context=storage_context)
+    if client.count(staging, exact=True).count != len(nodes):
+        raise ValueError("Yeni indeks eksik; mevcut hedef korunuyor.")
+    operations = []
+    if target in aliases:
+        operations.append(models.DeleteAliasOperation(delete_alias=models.DeleteAlias(alias_name=target)))
+    operations.append(models.CreateAliasOperation(
+        create_alias=models.CreateAlias(collection_name=staging, alias_name=target)
+    ))
+    client.update_collection_aliases(change_aliases_operations=operations)
+    # Old and failed builds remain available for inspection/rollback; no auto-delete.
+    print(f"✅ Yeni indeks yayınlandı: {target} -> {staging}")
+    return staging
 
 if __name__ == "__main__":
     run_ingestion()

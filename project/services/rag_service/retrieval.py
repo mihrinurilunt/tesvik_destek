@@ -1,13 +1,14 @@
 import os
 import json
 from typing import List, Optional
-from qdrant_client import QdrantClient
+from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import Filter, FieldCondition, MatchValue
 from openai import AsyncOpenAI
 from pydantic import HttpUrl
 
 from shared.config import settings
 from shared.models import SourceChunk
+from shared.exceptions import RetrievalException
 from shared.logger import get_logger
 
 logger = get_logger(__name__)
@@ -15,7 +16,7 @@ logger = get_logger(__name__)
 QDRANT_URL = getattr(settings, "QDRANT_URL", os.environ.get("QDRANT_URL", "http://qdrant:6333"))
 OPENAI_API_KEY = getattr(settings, "OPENAI_API_KEY", os.environ.get("OPENAI_API_KEY", ""))
 
-qdrant_client = QdrantClient(url=QDRANT_URL)
+qdrant_client = AsyncQdrantClient(url=QDRANT_URL)
 openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
 
@@ -54,25 +55,16 @@ async def retrieve_chunks(
                 ]
             )
             
-        search_results = []
-        try:
-            # 1. Tercih: Güncel qdrant-client sürümleri için query_points API (v1.10+)
-            response = qdrant_client.query_points(
-                collection_name="tesvikler_v2",
-                query=vector,
-                limit=top_k,
-                query_filter=qdrant_filter
-            )
-            search_results = response.points
-        except AttributeError:
-            # 2. Tercih: Eski qdrant-client sürümleri için fallback/search metodu
-            search_results = qdrant_client.search(
-                collection_name="tesvikler_v2",
-                query_vector=vector,
-                limit=top_k,
-                query_filter=qdrant_filter
-            )
-            
+        response = await qdrant_client.query_points(
+            collection_name=settings.QDRANT_COLLECTION_NAME,
+            query=vector,
+            using=settings.QDRANT_VECTOR_NAME,
+            limit=top_k,
+            query_filter=qdrant_filter,
+            score_threshold=settings.MIN_RETRIEVAL_SCORE,
+        )
+        search_results = response.points
+
         sources = []
         for hit in search_results:
             payload = hit.payload or {}
@@ -97,7 +89,7 @@ async def retrieve_chunks(
                     pass
 
             validated_source_url = None
-            source_url = payload.get("source_url")
+            source_url = payload.get("source_url") or payload.get("application_url")
             if source_url:
                 try:
                     validated_source_url = HttpUrl(source_url)
@@ -137,4 +129,4 @@ async def retrieve_chunks(
         return sources
     except Exception as e:
         logger.error(f"Qdrant arama operasyonu sırasında hata: {e}")
-        return []
+        raise RetrievalException("Kaynak araması başarısız oldu.") from e
