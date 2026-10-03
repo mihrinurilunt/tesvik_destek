@@ -131,7 +131,12 @@ def run_ingestion():
             for sec in sections
         )
 
-        doc = Document(text=document_text, metadata=metadata, doc_id=validated_doc.program_id)
+        doc = Document(
+            text=document_text, metadata=metadata, doc_id=validated_doc.program_id,
+            # Structured fields remain in Qdrant; full content is already in text.
+            excluded_embed_metadata_keys=list(metadata),
+            excluded_llm_metadata_keys=list(metadata),
+        )
         documents.append(doc)
         
     print(f"📦 {len(documents)} adet döküman başarıyla doğrulandı ve hazırlandı. Qdrant'a yükleniyor...")

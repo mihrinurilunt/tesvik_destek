@@ -35,7 +35,7 @@ def get_program_urls(session) -> list[str]:
             continue
 
         segments = [s for s in path.split("/") if s]
-        if len(segments) < 3:  # Daha derin olmayan kategorileri de yakalayabilmek için limiti 3'e çektik
+        if len(segments) < 5:  # Kurum/kategori dizinlerini program olarak alma
             continue
 
         urls.add(href)
@@ -133,4 +133,6 @@ def parse_program(session, url: str) -> dict:
 
     sections = _parse_text_sections(soup) + _parse_file_sections(soup)
 
+    if not any(section.get("content", "").strip() for section in sections):
+        raise ValueError(f"Program içeriği bulunamadı: {url}")
     return make_record(url, "tubitak", program_name, sections)

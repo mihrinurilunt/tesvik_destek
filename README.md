@@ -46,3 +46,5 @@ Hedef isim fiziksel bir koleksiyonsa işlem açıklayıcı hatayla durur; otomat
 LLM veya retrieval kesintileri başarılı öneri gibi gösterilmez. `/health` yalnız servis canlılığıdır; harici bağlantıların hazır olduğunu kanıtlamaz.
 
 İlk inceleme ve kalan işler: [LOCAL_REVIEW.md](LOCAL_REVIEW.md).
+
+Son Docker ve canlı scraping kontrolünün kapsamı, düzeltmeler ve kalan kalite sorunları: [LIVE_SMOKE.md](LIVE_SMOKE.md).

@@ -3,6 +3,8 @@ TKDK Deep Scraper
 """
 
 from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlsplit, unquote
+import re
 from utils.http import get
 from utils.models import make_record, make_section
 
@@ -11,9 +13,6 @@ BASE = "https://www.tkdk.gov.tr"
 # Derin tarama için ana başlangıç sayfaları
 SEED_PAGES = [
     f"{BASE}/ipard/ipardprogrami",
-    f"{BASE}/ipard/ipard3-destekleme-tedbirleri",
-    f"{BASE}/Hibe/Takvim",
-    f"{BASE}/ipard/tedbirler"
 ]
 
 
@@ -29,17 +28,13 @@ def get_program_urls(session) -> list[str]:
 
         soup = BeautifulSoup(r.text, "html.parser")
         for a in soup.select("a[href]"):
-            href = a["href"].strip()
-            if href.startswith("/"):
-                href = BASE + href
-            if not href.startswith("http"):
-                continue
-                
-            # Teşvik ve mevzuatla ilgili olabilecek tüm alt bağlantıları toplayalım
-            if any(k in href.lower() for k in ["tesvik", "destek", "tedbir", "program", "m1", "m2", "m3", "m101", "m103", "m302"]):
-                urls.add(href)
-                
-    return list(urls)
+            href = urljoin(BASE, a["href"].strip())
+            parsed = urlsplit(href)
+            # Only official measure detail pages; exclude language/error links.
+            if parsed.hostname == urlsplit(BASE).hostname and parsed.path.lower().startswith("/tedbir/"):
+                urls.add(parsed._replace(query="", fragment="").geturl())
+
+    return sorted(urls)
 
 
 def _parse_table(table_el) -> str:
@@ -120,6 +115,14 @@ def parse_program(session, url: str) -> dict:
         or soup.select_one("h1")
     )
     program_name = title_el.get_text(strip=True) if title_el else url.split("/")[-1].replace("-", " ").title()
+
+    if program_name.casefold() in {"sektörler", "sektorler", "tedbirler"}:
+        # Some measure pages use a generic h1. Prefer their navigation label.
+        path = urlsplit(url).path
+        label = next((a.get_text(" ", strip=True) for a in soup.select("a[href]")
+                      if urlsplit(urljoin(BASE, a["href"])).path == path
+                      and a.get_text(" ", strip=True)), None)
+        program_name = label or re.sub(r"-\d+$", "", unquote(path.rsplit("/", 1)[-1])).replace("-", " ").title()
 
     sections = _heading_sections(soup)
 

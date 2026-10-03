@@ -98,3 +98,18 @@ def test_recommendation_flow_through_service_http_contracts(db, monkeypatch):
     assert len(result['matches']) == len(result['recommendations']) == 1
     assert result['sources'][0]['source_url'] == 'https://example.org/program'
     assert result['recommendations'][0]['summary'] == 'Kaynaklara dayalı test önerisi.'
+
+
+def test_long_scraped_metadata_does_not_exceed_chunk_budget(db, monkeypatch, tmp_path):
+    import json
+    record = {'program_id':'long_1','program_name':'Uzun Destek','institution':'KOSGEB',
+              'url':'https://example.org/program','sections':[{'title':'Başvuru Şartları','content':'Resmi başvuru koşulu. '*1500}]}
+    path=tmp_path/'input.json'; path.write_text(json.dumps([record]))
+    monkeypatch.setattr(ingestion, 'JSON_PATH', str(path))
+    monkeypatch.setattr(ingestion, 'OpenAIEmbedding', lambda **kwargs: MockEmbedding(embed_dim=3))
+    monkeypatch.setattr(ingestion.qdrant_client, 'QdrantClient', lambda **kwargs: db)
+    monkeypatch.setattr(db, 'close', lambda: None)
+    ingestion.run_ingestion()
+    points, _ = db.scroll('tesvikler_v2', limit=1)
+    assert points[0].payload['conditions']
+    assert db.count('tesvikler_v2').count > 1
